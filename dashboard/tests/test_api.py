@@ -10,6 +10,8 @@ os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="bob-governance-test-")
 os.environ["INGEST_TOKEN"] = "test-ingest-token"
 os.environ["DASHBOARD_USER"] = "governance"
 os.environ["DASHBOARD_PASSWORD"] = "test-dashboard-password"
+# The original suite exercises the broader product allowlist; the lab default is tested in test_lab.py.
+os.environ.setdefault("LAB_PACKAGE_ALLOWLIST", "fastapi,httpx,numpy,pandas,pydantic,pytest,requests")
 
 from fastapi.testclient import TestClient
 
@@ -77,7 +79,7 @@ def test_secret_prompt_is_blocked_and_redacted():
     ).json()["event"]
     assert event["rule_id"] == "GOV-PROMPT-001"
     assert secret not in event["prompt_content"]
-    assert "[REDACTED: OpenAI-style API key]" in event["prompt_content"]
+    assert "[REDACTED: sk-prefixed API key]" in event["prompt_content"]
 
 
 def test_tool_duration_and_post_tool_context():
@@ -131,7 +133,7 @@ def test_normalized_event_metadata_is_redacted_and_not_cacheable():
     assert response.headers["cache-control"] == "no-store"
     stored = response.json()["events"][0]
     assert secret not in json.dumps(stored)
-    assert "[REDACTED: OpenAI-style API key]" in stored["detail"]
+    assert "[REDACTED: sk-prefixed API key]" in stored["detail"]
 
 
 def test_deferred_event_preserves_endpoint_decision_and_original_policy():

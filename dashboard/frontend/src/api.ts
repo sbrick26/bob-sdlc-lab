@@ -1,4 +1,4 @@
-import type { Analytics, Facets, FleetDevice, GovernanceEvent, PolicyCatalog, PolicyDraft, Rollout } from './types';
+import type { Analytics, Facets, FleetDevice, GovernanceEvent, LabRoi, LabTicket, PolicyCatalog, PolicyDraft, Rollout } from './types';
 import { policyConfig } from './policyWorkflow';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -18,6 +18,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  labBoard: () => request<{ count: number; tickets: LabTicket[] }>('/api/v1/lab/board'),
+  labRoi: (baselineMinutes = 240) => request<LabRoi>(`/api/v1/lab/roi?baseline_minutes=${baselineMinutes}`),
   analytics: (days = 30) => request<Analytics>(`/api/v1/analytics?days=${days}&granularity=auto`),
   events: (params = new URLSearchParams()) => request<{ count: number; events: GovernanceEvent[] }>(`/api/v1/events?${params}`),
   event: async (eventId: string) => (await request<{ event: GovernanceEvent }>(`/api/v1/events/${encodeURIComponent(eventId)}`)).event,

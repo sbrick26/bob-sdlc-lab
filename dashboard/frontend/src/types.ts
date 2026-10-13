@@ -30,6 +30,14 @@ export interface GovernanceEvent {
   tool_output_content?: string | null;
   response_content?: string | null;
   source?: string | null;
+  lab_ticket?: string | null;
+  lab_role?: string | null;
+  lab_branch?: string | null;
+  lab_cost?: number | null;
+  lab_path?: string | null;
+  lab_kind?: string | null;
+  lab_pr?: number | null;
+  lab_data?: Record<string, unknown> | null;
 }
 
 export interface Analytics {
@@ -71,6 +79,8 @@ export interface Facets {
   severities: string[];
   events: string[];
   tools: string[];
+  tickets?: string[];
+  roles?: string[];
 }
 
 export interface FleetDevice {
@@ -120,4 +130,33 @@ export interface Rollout {
   reporting_devices?: number;
   message?: string;
   error?: string | null;
+}
+
+export type LabStatus = 'planning' | 'building' | 'pr_open' | 'merged';
+
+export interface LabTicket {
+  ticket: string;
+  user: string | null;
+  status: LabStatus;
+  started_at: string | null;
+  merged_at: string | null;
+  minutes: number | null;
+  prompts: number;
+  tool_calls: number;
+  blocks: number;
+  ci: { first_try_pass: boolean | null; verdict: string | null; findings: number | null; runs: number };
+  pr: number | null;
+  approver: string | null;
+  review_rounds: number | null;
+  lines_changed: number | null;
+  branch: string | null;
+  cost_credits: number | null;
+}
+
+export interface LabRoi {
+  baseline_minutes: number;
+  tickets: Array<{ ticket: string; user: string | null; status: LabStatus; minutes: number | null; baseline_minutes: number; minutes_saved: number | null; blocks_before_merge: number; cost_credits: number | null }>;
+  totals: { tickets: number; tickets_merged: number; merged_minutes: number; baseline_minutes_total: number; minutes_saved: number; pct_faster: number | null; blocks_before_merge: number; cost_per_merged_pr: number | null };
+  review: { prs_with_ci: number; first_try_passes: number; first_try_pass_rate_pct: number | null; findings_per_pr: number | null };
+  headline: string;
 }

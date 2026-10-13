@@ -34,6 +34,11 @@ export function EventDetail({ event, onClose }: { event: GovernanceEvent; onClos
             <div><dt>Tool</dt><dd>{event.tool_name || '—'}</dd></div>
             <div><dt>Evaluation time</dt><dd>{event.duration_ms == null ? 'Not measured' : `${event.duration_ms} ms`}</dd></div>
             <div><dt>Observed tool duration</dt><dd>{event.tool_duration_ms == null ? 'Not measured' : `${event.tool_duration_ms} ms`}</dd></div>
+            {event.lab_ticket && <div><dt>Ticket</dt><dd>{event.lab_ticket}</dd></div>}
+            {event.lab_role && <div><dt>Lab role</dt><dd>{event.lab_role}</dd></div>}
+            {event.lab_branch && <div><dt>Branch</dt><dd>{event.lab_branch}</dd></div>}
+            {event.lab_path && <div><dt>File</dt><dd>{event.lab_path}</dd></div>}
+            {event.lab_pr != null && <div><dt>Pull request</dt><dd>#{event.lab_pr}</dd></div>}
             <div><dt>Outcome</dt><dd>{event.outcome?.replaceAll('_', ' ') || '—'}</dd></div>
           </dl>
           {(event.detail || event.evidence) && <section className="detail-block"><h3>Finding</h3><p>{event.detail || event.evidence}</p></section>}

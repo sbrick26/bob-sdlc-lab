@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import db
+from . import lab
 from . import mdm
 from .policies import PACKAGE_ALLOWLIST, POLICY_VERSION, RULES, default_policy_config, prompt_rule_id, rule
 from .profile import build_profile
@@ -70,7 +71,7 @@ SAFE_TEXT = re.compile(r"^[^\x00-\x08\x0b\x0c\x0e-\x1f]{0,512}$")
 MAX_CONTENT = 16_000
 
 SECRET_PATTERNS = [
-    ("OpenAI-style API key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
+    ("sk-prefixed API key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
     ("GitHub token", re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b")),
     ("AWS access key", re.compile(r"\bAKIA[0-9A-Z]{12,}\b")),
     ("Slack token", re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b")),
@@ -167,6 +168,12 @@ def clean_event(body: dict[str, Any], *, allow_content: bool = False) -> dict[st
             event[field] = None if value is None else min(max(int(value), 0), 86_400_000)
         elif field in {"finding_count", "content_logged"}:
             event[field] = min(max(int(value or 0), 0), 10_000)
+        elif field == "lab_data":
+            event[field] = value if isinstance(value, dict) else None
+        elif field == "lab_pr":
+            event[field] = None if value is None else min(max(int(value), 0), 10_000_000)
+        elif field == "lab_cost":
+            event[field] = None if value is None else float(value)
         elif field in {"prompt_content", "tool_input_content", "tool_output_content", "response_content"}:
             event[field] = str(value)[:MAX_CONTENT] if value is not None else None
         elif value is None:
@@ -311,6 +318,71 @@ def package_install_findings(
     return "+".join(ecosystems), combined
 
 
+PII_WRITE_TOOLS = {"write_file", "apply_diff", "insert_content", "search_and_replace"}
+PII_PHONE = re.compile(r"\b\d{3}-\d{3}-\d{4}\b")
+PII_EXEMPT_DIRS = ("data", "tests")
+PATH_KEYS = ("path", "file_path", "target_file", "filePath", "file")
+GIT_RULES = (
+    (re.compile(r"(?:^|\s)--no-verify(?:\s|$)"), "Do not skip git hooks with --no-verify."),
+    (re.compile(r"(?:^|\s)--force(?:\s|$)"), "Do not force-push or force git operations with --force."),
+    (re.compile(r"\bpush\b(?:.*\s)?-f(?:\s|$)"), "Do not force-push with push -f."),
+    (re.compile(r"\bpush\s+origin\s+(?:\S+:)?main\b"), "Do not push straight to main; open a pull request from a branch."),
+)
+
+
+def tool_input_path(value: Any) -> str | None:
+    """Return the file path named in a tool input, if any."""
+    if isinstance(value, dict):
+        for key in PATH_KEYS:
+            if isinstance(value.get(key), str) and value[key].strip():
+                return value[key].strip()[:512]
+        if isinstance(value.get("args"), dict):
+            return tool_input_path(value["args"])
+    return None
+
+
+def _strings(value: Any, skip: set[str]) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [text for key, child in value.items() if key not in skip for text in _strings(child, skip)]
+    if isinstance(value, list):
+        return [text for child in value for text in _strings(child, skip)]
+    return []
+
+
+def path_is_exempt_for_pii(path: str | None) -> bool:
+    if not path:
+        return False
+    parts = [part for part in path.replace("\\", "/").split("/") if part not in {"", "."}]
+    return any(part in PII_EXEMPT_DIRS for part in parts[:-1])
+
+
+def pii_findings(tool_name: str | None, value: Any) -> list[str]:
+    """GOV-PII-001: unmasked US phone numbers written outside data/ and tests/."""
+    if tool_name not in PII_WRITE_TOOLS or path_is_exempt_for_pii(tool_input_path(value)):
+        return []
+    found: set[str] = set()
+    for text in _strings(value, set(PATH_KEYS)):
+        found.update(PII_PHONE.findall(text))
+    return sorted(found)
+
+
+def git_findings(tool_name: str | None, value: Any) -> list[str]:
+    """GOV-GIT-001: reasons for each unsafe git pattern in an execute_command input."""
+    if tool_name != "execute_command":
+        return []
+    command = _command_text(value)
+    reasons: list[str] = []
+    for segment in re.split(r"(?:&&|\|\||[;|\n])", command):
+        if not re.search(r"\bgit\b", segment):
+            continue
+        for pattern, reason in GIT_RULES:
+            if pattern.search(segment) and reason not in reasons:
+                reasons.append(reason)
+    return reasons
+
+
 def runtime_rules() -> dict[str, dict[str, Any]]:
     active = db.active_policy()
     entries = (active or {}).get("config", {}).get("rules", [])
@@ -354,6 +426,32 @@ def rule_enabled(entries: dict[str, dict[str, Any]], rule_id: str) -> bool:
 def safe_header(value: str | None, fallback: str) -> str:
     text = (value or fallback).strip()
     return re.sub(r"[^A-Za-z0-9@._ -]", "", text)[:120] or fallback
+
+
+TICKET_PATTERN = re.compile(r"[A-Z][A-Z0-9]{0,9}-\d{1,6}")
+
+
+def lab_ticket(value: str | None) -> str | None:
+    text = (value or "").strip().upper()
+    return text if TICKET_PATTERN.fullmatch(text) else None
+
+
+def lab_role(value: str | None) -> str | None:
+    text = (value or "").strip().lower()
+    return text if text in lab.LAB_ROLES else None
+
+
+def lab_branch(value: str | None) -> str | None:
+    text = re.sub(r"[^A-Za-z0-9._/-]", "", (value or "").strip())[:120]
+    return text or None
+
+
+def lab_cost(value: str | None) -> float | None:
+    try:
+        cost = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return round(cost, 6) if 0 <= cost < 1_000_000 else None
 
 
 @app.get("/", response_class=HTMLResponse, dependencies=[Depends(require_dashboard)])
@@ -415,6 +513,10 @@ async def ingest_hook(
     x_governance_local_rule: str | None = Header(None, alias="X-Governance-Local-Rule"),
     x_governance_local_outcome: str | None = Header(None, alias="X-Governance-Local-Outcome"),
     x_governance_local_severity: str | None = Header(None, alias="X-Governance-Local-Severity"),
+    x_lab_ticket: str | None = Header(None, alias="X-Lab-Ticket"),
+    x_lab_role: str | None = Header(None, alias="X-Lab-Role"),
+    x_lab_branch: str | None = Header(None, alias="X-Lab-Branch"),
+    x_lab_cost: str | None = Header(None, alias="X-Lab-Cost"),
 ) -> dict[str, Any]:
     """Receive Bob's native hook envelope, decide centrally, and store a redacted record."""
     started = time.perf_counter_ns()
@@ -443,6 +545,9 @@ async def ingest_hook(
     package_ecosystem, unapproved_packages = package_install_findings(
         tool_input_raw, package_configuration.get("allowlist")
     )
+    tool_name = str(payload.get("tool_name") or "")[:120] or None
+    phone_numbers = pii_findings(tool_name, tool_input_raw) if hook_event == "PreToolUse" else []
+    git_reasons = git_findings(tool_name, tool_input_raw) if hook_event == "PreToolUse" else []
 
     decision = "allowed"
     severity = "info"
@@ -472,6 +577,18 @@ async def ingest_hook(
         finding_count = len(unapproved_packages)
         package_list = ", ".join(unapproved_packages)
         reason = f"Blocked by Governance: GOV-PKG-001. Not approved for {package_ecosystem}: {package_list}."
+        outcome = "prevented_before_tool"
+    elif hook_event == "PreToolUse" and phone_numbers and rule_enabled(active_rules, "GOV-PII-001"):
+        decision, severity = "blocked", "high"
+        rule_id, rule_name = "GOV-PII-001", rule("GOV-PII-001")["name"]
+        finding_count = len(phone_numbers)
+        reason = "Blocked by Governance: GOV-PII-001. Customer phone numbers must be masked as 415-555-****"
+        outcome = "prevented_before_tool"
+    elif hook_event == "PreToolUse" and git_reasons and rule_enabled(active_rules, "GOV-GIT-001"):
+        decision, severity = "blocked", "high"
+        rule_id, rule_name = "GOV-GIT-001", rule("GOV-GIT-001")["name"]
+        finding_count = len(git_reasons)
+        reason = "Blocked by Governance: GOV-GIT-001. " + " ".join(git_reasons)
         outcome = "prevented_before_tool"
     elif hook_event == "PostToolUse" and output_hits and rule_enabled(active_rules, "GOV-POST-001"):
         decision, severity = "observed", "high"
@@ -518,6 +635,10 @@ async def ingest_hook(
     detail = (
         f"Unapproved {package_ecosystem} package: {', '.join(unapproved_packages)}"
         if unapproved_packages and rule_id == "GOV-PKG-001"
+        else f"Unmasked phone number in {tool_input_path(tool_input_raw) or 'file write'}"
+        if rule_id == "GOV-PII-001"
+        else f"Unsafe git command: {' '.join(git_reasons)}"
+        if rule_id == "GOV-GIT-001"
         else f"Matched {', '.join(secret_findings)}" if finding_count
         else "Policy hook completed"
     )
@@ -549,7 +670,7 @@ async def ingest_hook(
         "rule_name": rule_name,
         "severity": severity,
         "workspace": workspace,
-        "tool_name": str(payload.get("tool_name") or "")[:120] or None,
+        "tool_name": tool_name,
         "tool_category": "tool" if payload.get("tool_name") else None,
         "tool_use_id": opaque_tool,
         "outcome": outcome,
@@ -561,12 +682,20 @@ async def ingest_hook(
         "hook_status": "complete",
         "content_logged": content_logged,
         "detail": detail,
-        "evidence": ", ".join(unapproved_packages if rule_id == "GOV-PKG-001" else secret_findings) or None,
+        "evidence": (
+            f"{len(phone_numbers)} unmasked phone number(s)" if rule_id == "GOV-PII-001"
+            else ", ".join(unapproved_packages if rule_id == "GOV-PKG-001" else secret_findings) or None
+        ),
         "prompt_content": prompt_text or None,
         "tool_input_content": tool_input_text or None,
         "tool_output_content": tool_output_text or None,
         "response_content": response_text or None,
         "session_id": opaque(session),
+        "lab_ticket": lab_ticket(x_lab_ticket),
+        "lab_role": lab_role(x_lab_role),
+        "lab_branch": lab_branch(x_lab_branch),
+        "lab_cost": lab_cost(x_lab_cost),
+        "lab_path": tool_input_path(tool_input_raw),
     }
     db.insert_event(clean_event(event, allow_content=True))
     if db.storage_health().get("status") == "degraded":
@@ -579,6 +708,7 @@ def events(
     user: str | None = None, device: str | None = None, profile: str | None = None,
     source: str | None = None, decision: str | None = None, rule: str | None = None,
     severity: str | None = None, event: str | None = None, tool: str | None = None,
+    ticket: str | None = None, role: str | None = None,
     q: str | None = None, limit: int = Query(250, ge=1, le=1000),
     sort: str = "time", direction: str = "desc",
 ) -> dict[str, Any]:
@@ -772,6 +902,14 @@ def publish_policy(
         candidate, rollout_id = db.publish_policy_draft(version, actor)
     except ObjectStoreUnavailable as exc:
         raise HTTPException(503, "The policy release could not be staged durably. Nothing was published.") from exc
+    if lab_mode():
+        # Lab mode: no MDM. The staged release becomes the active policy in the
+        # object store, and hook decisions use it at once.
+        try:
+            published = db.finalize_policy_publication(rollout_id, target_count=0)
+        except ObjectStoreUnavailable as exc:
+            raise HTTPException(503, "The policy release could not be finalized durably. The current active policy was not changed.") from exc
+        return {"ok": True, "policy": published, "rollout": db.latest_rollout(), "rollout_id": rollout_id, "mode": "lab"}
     public_url = (os.environ.get("PUBLIC_BASE_URL") or str(request.base_url)).rstrip("/")
     try:
         profile = build_profile(
@@ -806,3 +944,132 @@ def publish_policy(
 def rollout_latest(actor: str = Depends(require_dashboard)) -> dict[str, Any]:
     del actor
     return {"rollout": db.latest_rollout()}
+
+
+def lab_mode() -> bool:
+    return (os.environ.get("LAB_MODE") or "").strip().lower() in {"1", "true", "yes"}
+
+
+CI_VERDICTS = {"PASS", "FAIL"}
+
+
+class LabEvent(BaseModel):
+    kind: str = Field(pattern="^(pr_opened|ci_result|approved|merged|ticket_started|ticket_done)$")
+    user: str = Field(min_length=1, max_length=120)
+    ticket: str = Field(min_length=1, max_length=20)
+    pr: int | None = Field(default=None, ge=0, le=10_000_000)
+    data: dict[str, Any] = Field(default_factory=dict)
+    role: str | None = None
+    branch: str | None = None
+    cost: float | None = None
+    occurred_at: str | None = None
+    event_id: str | None = None
+
+
+def _lab_number(data: dict[str, Any], key: str, kind: type) -> Any:
+    value = data.get(key)
+    if value is None:
+        return None
+    try:
+        number = kind(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(422, f"data.{key} must be a number") from exc
+    if number < 0:
+        raise HTTPException(422, f"data.{key} must not be negative")
+    return number
+
+
+def clean_lab_data(kind: str, data: dict[str, Any]) -> dict[str, Any]:
+    """Validate the data object of a lab event. Values stay short and scalar."""
+    reject_sensitive_shape(data)
+    if len(json.dumps(data)) > 4096:
+        raise HTTPException(413, "lab event data is too large")
+    if kind == "ci_result":
+        verdict = str(data.get("verdict") or "").upper()
+        if verdict not in CI_VERDICTS:
+            raise HTTPException(422, "data.verdict must be PASS or FAIL")
+        return {
+            "tests_passed": _lab_number(data, "tests_passed", int),
+            "tests_total": _lab_number(data, "tests_total", int),
+            "verdict": verdict,
+            "findings": _lab_number(data, "findings", int),
+            "blocking": _lab_number(data, "blocking", int),
+            "seconds": _lab_number(data, "seconds", float),
+        }
+    if kind == "merged":
+        approver = data.get("approver")
+        return {
+            "approver": safe_header(str(approver), "") or None if approver is not None else None,
+            "review_rounds": _lab_number(data, "review_rounds", int),
+            "lines_changed": _lab_number(data, "lines_changed", int),
+        }
+    cleaned: dict[str, Any] = {}
+    for key, value in list(data.items())[:20]:
+        name = re.sub(r"[^A-Za-z0-9_]", "", str(key))[:40]
+        if not name:
+            continue
+        if isinstance(value, (bool, int, float)) or value is None:
+            cleaned[name] = value
+        else:
+            text = str(value)
+            if not SAFE_TEXT.match(text):
+                raise HTTPException(422, f"invalid text in data.{name}")
+            cleaned[name] = text[:256]
+    return cleaned
+
+
+@app.post("/api/v1/lab/events", dependencies=[Depends(require_ingest)])
+def ingest_lab_event(body: LabEvent) -> dict[str, Any]:
+    """Record a lab event that happens outside Bob (GitHub, CI)."""
+    ticket = lab_ticket(body.ticket)
+    if not ticket:
+        raise HTTPException(422, "ticket must look like KAN-201")
+    data = clean_lab_data(body.kind, body.data)
+    default_role = "ci-reviewer" if body.kind == "ci_result" else None
+    detail = f"{body.kind.replace('_', ' ')} for {ticket}" + (f" (PR #{body.pr})" if body.pr is not None else "")
+    if body.kind == "ci_result":
+        detail += f": {data['verdict']}, {data.get('findings') or 0} findings"
+    event_id = (
+        body.event_id.lower()
+        if body.event_id and re.fullmatch(r"[0-9a-fA-F-]{36}", body.event_id)
+        else str(uuid.uuid4())
+    )
+    event = {
+        "event_id": event_id,
+        "occurred_at": safe_occurred_at(body.occurred_at),
+        "user_name": safe_header(body.user, "unknown user"),
+        "device_name": "ci" if body.kind == "ci_result" else "github",
+        "device_id": None,
+        "organization": "Governance",
+        "source": "lab",
+        "delivery": "lab-event",
+        "profile_name": "Bob SDLC Lab",
+        "profile_id": "bob-sdlc-lab",
+        "policy_version": active_policy_version(),
+        "hook_event": f"lab.{body.kind}",
+        "decision": "allowed",
+        "severity": "info",
+        "outcome": body.kind,
+        "detail": detail,
+        "finding_count": int(data.get("findings") or 0) if body.kind == "ci_result" else 0,
+        "lab_ticket": ticket,
+        "lab_role": lab_role(body.role) or default_role,
+        "lab_branch": lab_branch(body.branch),
+        "lab_cost": lab_cost(None if body.cost is None else str(body.cost)),
+        "lab_kind": body.kind,
+        "lab_pr": body.pr,
+        "lab_data": data,
+    }
+    inserted = db.insert_event(clean_event(event, allow_content=True))
+    return {"ok": True, "event_id": event_id, "inserted": inserted}
+
+
+@app.get("/api/v1/lab/board", dependencies=[Depends(require_dashboard)])
+def lab_board() -> dict[str, Any]:
+    rows = lab.lab_board(db.all_events())
+    return {"count": len(rows), "tickets": rows}
+
+
+@app.get("/api/v1/lab/roi", dependencies=[Depends(require_dashboard)])
+def lab_roi(baseline_minutes: float = Query(240, gt=0, le=100_000)) -> dict[str, Any]:
+    return lab.lab_roi(db.all_events(), baseline_minutes=baseline_minutes)

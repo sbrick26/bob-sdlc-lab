@@ -1,0 +1,28 @@
+#!/bin/bash
+# Start the lab dashboard locally on port 8080 with demo credentials.
+# Lab mode: local object store under ./data, policy publish without MDM.
+set -euo pipefail
+cd "$(dirname "$0")"
+
+PORT="${PORT:-8080}"
+export LAB_MODE=1
+export OBJECT_STORE_MODE=local
+export DATA_DIR="${DATA_DIR:-./data}"
+export INGEST_TOKEN="${INGEST_TOKEN:-lab-ingest-token}"
+export DASHBOARD_USER="${DASHBOARD_USER:-governance}"
+export DASHBOARD_PASSWORD="${DASHBOARD_PASSWORD:-lab}"
+
+if [ ! -x .venv/bin/python ]; then
+  python3 -m venv .venv
+  .venv/bin/pip install -q -r requirements.txt
+fi
+if [ ! -f frontend/dist/index.html ]; then
+  npm --prefix frontend ci --no-audit --no-fund
+  npm --prefix frontend run build
+fi
+mkdir -p "${DATA_DIR}"
+
+echo "Lab dashboard: http://localhost:${PORT}/  (user ${DASHBOARD_USER}, password ${DASHBOARD_PASSWORD})"
+echo "Hook ingest:   POST http://localhost:${PORT}/api/v1/hooks  (Bearer ${INGEST_TOKEN})"
+echo "Seed data:     .venv/bin/python scripts/seed-lab.py"
+exec .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port "${PORT}"

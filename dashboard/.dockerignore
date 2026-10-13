@@ -2,12 +2,15 @@
 .venv
 __pycache__
 *.pyc
+.pytest_cache
 data
 tests
 tmp
-profiles
 scripts
 frontend/node_modules
+frontend/dist
 frontend/.vite
 frontend/.cache
+.env
+.env.*
 .DS_Store

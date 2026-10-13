@@ -1,8 +1,9 @@
-import { Activity, Catalog, ChartLine, Policy, Renew, UserMultiple } from '@carbon/icons-react';
+import { Activity, Catalog, ChartLine, Education, Policy, Renew, UserMultiple } from '@carbon/icons-react';
 import { Header, HeaderGlobalAction, HeaderGlobalBar, HeaderName } from '@carbon/react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 
 const navigation = [
+  { to: '/lab', label: 'Lab', icon: Education },
   { to: '/overview', label: 'Overview', icon: ChartLine },
   { to: '/activity', label: 'Activity', icon: Activity },
   { to: '/users', label: 'Users', icon: UserMultiple },
@@ -14,7 +15,7 @@ export function AppShell() {
     <div className="app-shell">
       <a className="skip-link" href="#main-content">Skip to content</a>
       <Header aria-label="Governance">
-        <HeaderName as={Link} to="/overview" prefix="">Governance</HeaderName>
+        <HeaderName as={Link} to="/lab" prefix="">Governance</HeaderName>
         <span className="header-context">IBM Bob</span>
         <HeaderGlobalBar>
           <HeaderGlobalAction aria-label="Refresh page" onClick={() => window.location.reload()}><Renew /></HeaderGlobalAction>

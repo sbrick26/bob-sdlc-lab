@@ -9,8 +9,8 @@ import { PageError, PageLoading } from '../components/States';
 import { useApi } from '../hooks';
 import type { GovernanceEvent } from '../types';
 
-type Filters = { decision: string; user: string; event: string; rule: string; severity: string; q: string };
-const initial: Filters = { decision: '', user: '', event: '', rule: '', severity: '', q: '' };
+type Filters = { decision: string; user: string; event: string; rule: string; severity: string; ticket: string; role: string; q: string };
+const initial: Filters = { decision: '', user: '', event: '', rule: '', severity: '', ticket: '', role: '', q: '' };
 
 export function ActivityPage() {
   const [filters, setFilters] = useState(initial);
@@ -48,6 +48,8 @@ export function ActivityPage() {
           <FacetSelect id="filter-event" label="Control point" value={filters.event} values={facets.events} onChange={(value) => update('event', value)} />
           <FacetSelect id="filter-rule" label="Rule" value={filters.rule} values={facets.rules} onChange={(value) => update('rule', value)} />
           <FacetSelect id="filter-severity" label="Severity" value={filters.severity} values={facets.severities} onChange={(value) => update('severity', value)} />
+          <FacetSelect id="filter-ticket" label="Ticket" value={filters.ticket} values={facets.tickets ?? []} onChange={(value) => update('ticket', value)} />
+          <FacetSelect id="filter-role" label="Lab role" value={filters.role} values={facets.roles ?? []} onChange={(value) => update('role', value)} />
         </div>
       </section>
       <section className="panel activity-panel">

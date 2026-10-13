@@ -1,4 +1,50 @@
-# Bob Governance
+# Lab dashboard
+
+This folder is the Bob SDLC lab dashboard. It is the Bob Governance service
+(below) with lab additions:
+
+- **Lab headers** on every hook event: `X-Lab-Ticket` (for example `KAN-201`),
+  `X-Lab-Role` (`participant`, `ci-reviewer`, `guide`), `X-Lab-Branch`, and an
+  optional `X-Lab-Cost` (usage credits). Ticket and role are filters and facets
+  in `/api/v1/events` and `/api/v1/facets`.
+- **Lab events** from outside Bob (GitHub, CI): `POST /api/v1/lab/events`
+  with `Authorization: Bearer <INGEST_TOKEN>` and
+  `{"kind", "user", "ticket", "pr", "data"}`. Kinds: `pr_opened`, `ci_result`,
+  `approved`, `merged`, `ticket_started`, `ticket_done`. Optional fields:
+  `role`, `branch`, `cost`, `occurred_at`, `event_id` (UUID, makes the post idempotent).
+- **Board**: `GET /api/v1/lab/board`, one row per ticket with status
+  (planning, building, pr_open, merged), minutes, prompts, tool calls, blocks,
+  CI result and cost.
+- **ROI**: `GET /api/v1/lab/roi?baseline_minutes=240`, minutes against a manual
+  baseline, blocks before merge, cost per merged PR, review pass rate. The
+  math is in the `lab_roi` docstring in `app/lab.py`.
+- **Lab rules**: `GOV-PKG-001` uses `LAB_PACKAGE_ALLOWLIST` (default
+  `flask,pytest,mcp,pyyaml`), `GOV-PII-001` blocks unmasked phone numbers,
+  `GOV-GIT-001` blocks unsafe git commands.
+- **`LAB_MODE=1`**: policy publish activates the policy in the object store
+  without MDM. Dashboard basic auth still applies.
+- **Lab page**: the first item in the console navigation.
+
+## Run it locally
+
+```bash
+./run-local.sh                         # http://localhost:8080  user governance  password lab
+.venv/bin/python scripts/seed-lab.py   # four-person demo run (sam, priya, jordan, alex)
+curl -u governance:lab localhost:8080/api/v1/lab/board
+```
+
+The demo credentials are fixed and public. Use real secrets for any shared
+deployment. See [DEPLOY.md](DEPLOY.md) for Code Engine.
+
+## Tests
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest -q
+npm --prefix frontend ci && npm --prefix frontend test && npm --prefix frontend run build
+```
+
+# Bob Governance (base service)
 
 Bob Governance is a centrally managed policy and telemetry service for IBM Bob.
 Administrators define controls in a React console, publish immutable policy
@@ -35,6 +81,8 @@ versions, and roll the managed configuration to Bob devices through MDM.
 | `GOV-POST-001` | `PostToolUse` | Record a finding and add corrective next-turn context |
 | `GOV-RESP-001` | `Stop` | Record credential-shaped response content |
 | `GOV-HOOK-001` | prompt/tool pre-hook | Block an unscannable oversized payload |
+| `GOV-PII-001` | `PreToolUse` (file writes) | Block an unmasked US phone number outside `data/` and `tests/` |
+| `GOV-GIT-001` | `PreToolUse` (`execute_command`) | Block `--no-verify`, `--force`, `push -f`, `push origin main` |
 
 Managed references remain allowed, including `${MY_API_KEY}`, `$MY_API_KEY`,
 `process.env.MY_API_KEY`, `os.environ[...]`, `os.getenv(...)`, `vault://...`,
@@ -51,11 +99,13 @@ Policy console → validate → immutable version → active policy
                                         └→ managed profile update + group sync
 ```
 
+The managed-profile offline checker covers the credential and package rules.
+`GOV-PII-001` and `GOV-GIT-001` are enforced by the central API only.
+
 COS stores immutable normalized event envelopes, optional redacted content
 objects, policy versions, draft revisions, rollout transitions, and short
 stream-outbox records. The application rebuilds its in-process query index from
-COS at startup; container-local disk is not the system of record. See
-[`docs/storage.md`](docs/storage.md) for the object contract.
+COS at startup; container-local disk is not the system of record.
 
 The stream outbox contains a short normalized event and `event_ref`/
 `content_ref`. A future Event Streams, Kafka, or Confluent publisher can deliver
@@ -73,7 +123,8 @@ prevents every hook from waiting on the same outage.
 
 ## Deploy
 
-The deploy script builds the React bundle, builds and pushes an amd64 image,
+For the lab, use [DEPLOY.md](DEPLOY.md). The original MDM-mode deploy script
+builds the React bundle, builds and pushes an amd64 image,
 creates a dedicated bucket in the existing COS service when necessary, binds
 that service to Code Engine with the Writer role, updates server secrets, and
 verifies both application and durable-storage health.
@@ -82,7 +133,8 @@ verifies both application and durable-storage health.
 ./scripts/deploy-code-engine.sh
 ```
 
-The application name is `bob-governance`. Dashboard credentials, the ingest
+It requires the account, project, COS and registry names as environment
+variables. Dashboard credentials, the ingest
 credential, and the MDM API credential remain in Keychain and Code Engine
 secrets; the script does not print them.
 

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { PageLoading } from './components/States';
 
+const LabPage = lazy(() => import('./pages/LabPage').then((module) => ({ default: module.LabPage })));
 const OverviewPage = lazy(() => import('./pages/OverviewPage').then((module) => ({ default: module.OverviewPage })));
 const ActivityPage = lazy(() => import('./pages/ActivityPage').then((module) => ({ default: module.ActivityPage })));
 const UsersPage = lazy(() => import('./pages/UsersPage').then((module) => ({ default: module.UsersPage })));
@@ -13,12 +14,13 @@ export function App() {
     <Suspense fallback={<PageLoading />}>
       <Routes>
         <Route element={<AppShell />}>
-          <Route index element={<Navigate to="/overview" replace />} />
+          <Route index element={<Navigate to="/lab" replace />} />
+          <Route path="lab" element={<LabPage />} />
           <Route path="overview" element={<OverviewPage />} />
           <Route path="activity" element={<ActivityPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="policies" element={<PoliciesPage />} />
-          <Route path="*" element={<Navigate to="/overview" replace />} />
+          <Route path="*" element={<Navigate to="/lab" replace />} />
         </Route>
       </Routes>
     </Suspense>
