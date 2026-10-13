@@ -1,0 +1,2 @@
+- [From project hooks to enforced hooks](enforced-hooks.md): what lab hooks can and cannot enforce, and how the `EnforcedHooks` policy closes the gap.
+- [Who holds the Jira credential](mcp-gateway.md): direct Atlassian OAuth versus an MCP gateway (IBM ContextForge).
