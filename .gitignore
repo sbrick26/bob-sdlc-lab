@@ -8,3 +8,5 @@ run/
 
 .vscode/
 .bob/mcp.json
+lanes/
+.secrets/
