@@ -1,8 +1,12 @@
 ---
 name: build
 description: Implement an approved plans/<KEY>.md tests first, self-review, open the PR, update Jira. Use in the Build mode or when the user runs /build <KEY>.
+metadata:
+  user-invocable: true
+  argument-hint: <TICKET-KEY>
 ---
 
+Ticket: $1. If you are not in the sdlc-build mode, switch to it first. Stop after the PR is open and the Jira ticket is In Review.
 # Build
 
 Preconditions: plans/<KEY>.md exists and says "Requester approval: approved". If not, stop and say so.

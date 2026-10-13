@@ -1,8 +1,12 @@
 ---
 name: review
 description: Review a branch or diff against its plan, the rules and the PR checklist, run the tests, and print the verdict block. Used by CI headless and by people in the Review mode or with /review.
+metadata:
+  user-invocable: true
+  argument-hint: [TICKET-KEY]
 ---
 
+Ticket: $1 (take it from the branch name when empty). If you are not in the sdlc-review mode, switch to it first. End with the verdict block.
 # Review
 
 Inputs: a ticket key (from the branch name, pattern <name>/<KEY>) and a diff (`git diff main...HEAD` or the file given).

@@ -6,3 +6,5 @@ lab.env
 .env
 run/
 
+.vscode/
+.bob/mcp.json

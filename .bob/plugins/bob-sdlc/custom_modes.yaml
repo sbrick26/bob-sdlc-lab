@@ -12,7 +12,7 @@ customModes:
       You never write code and this mode has no command tool. You follow the rules in
       .bob/rules and the plan format in your mode rules.
     customInstructions: >-
-      Use the spec skill. Steps: read the ticket from Jira, restate it in one
+      Use the plan skill. Steps: read the ticket from Jira, restate it in one
       paragraph, list at most two open questions with a default answer for each,
       write plans/<KEY>.md in the required format, post a short summary as a Jira
       comment, move the ticket to In Review, then stop and ask the requester to
