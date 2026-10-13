@@ -1,0 +1,418 @@
+# SDLC gate for the lab repo.
+#
+# Jobs:
+#   tests            pytest on every PR and push to main (no tests yet = pass).
+#   protected-paths  deterministic: a PR may not touch .bob/ .github/ governance/
+#                    tools/ dashboard/ unless the author is the repo owner or the
+#                    PR has the `platform` label.
+#   bob-review       headless Bob review of the PR against plans/<KEY>.md. Rules,
+#                    hooks, modes, checklist and CI helpers come from main, never
+#                    from the PR. No VERDICT line = fail closed.
+#   merged           on push to main: report the merge to the dashboard and move
+#                    the Jira ticket to Done.
+#
+# Secrets:
+#   BOBSHELL_API_KEY   required for bob-review
+#   DASHBOARD_URL      optional, lab dashboard base URL (fail open when missing)
+#   DASHBOARD_TOKEN    optional, Bearer token for the dashboard
+#   JIRA_BASE_URL      optional, e.g. https://<site>.atlassian.net
+#   JIRA_EMAIL         optional, Jira user for the API token
+#   JIRA_API_TOKEN     optional, Jira API token
+# Repository variable (optional):
+#   REVIEW_MODE        sdlc-review (default) or ask. Use ask when `bob run` does not
+#                      resolve the plugin mode headless; the review skill and the
+#                      verdict format are then put in the prompt.
+
+name: sdlc-gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  actions: read
+
+concurrency:
+  group: sdlc-gate-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.pytest.outputs.passed }}
+      total: ${{ steps.pytest.outputs.total }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements.txt pytest
+      - name: Run pytest
+        id: pytest
+        run: |
+          set +e
+          python -m pytest -q 2>&1 | tee "$RUNNER_TEMP/pytest.txt"
+          rc=${PIPESTATUS[0]}
+          set -e
+          summary="$(tail -n 1 "$RUNNER_TEMP/pytest.txt")"
+          passed="$(echo "$summary" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' || echo 0)"
+          failed="$(echo "$summary" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+' || echo 0)"
+          errors="$(echo "$summary" | grep -oE '[0-9]+ errors?' | grep -oE '[0-9]+' || echo 0)"
+          echo "passed=$passed" >> "$GITHUB_OUTPUT"
+          echo "total=$((passed + failed + errors))" >> "$GITHUB_OUTPUT"
+          if [ "$rc" -eq 5 ]; then
+            echo "pytest: no tests collected (exit 5). Treated as pass for now."
+            exit 0
+          fi
+          exit "$rc"
+
+  protected-paths:
+    name: protected-paths
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check protected paths (no model)
+        env:
+          ALLOW_PROTECTED: ${{ github.event.pull_request.user.login == github.repository_owner || contains(github.event.pull_request.labels.*.name, 'platform') }}
+          ALLOW_REASON: "author ${{ github.event.pull_request.user.login }}, owner ${{ github.repository_owner }}"
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch -q origin "$BASE_REF"
+          # The checker itself comes from main, so a PR cannot weaken it.
+          git show "origin/$BASE_REF:tools/ci/protected_paths.py" > "$RUNNER_TEMP/protected_paths.py"
+          git diff --name-only "origin/$BASE_REF...HEAD" | tee "$RUNNER_TEMP/changed.txt"
+          python3 "$RUNNER_TEMP/protected_paths.py" < "$RUNNER_TEMP/changed.txt"
+
+  bob-review:
+    name: bob-review
+    if: github.event_name == 'pull_request'
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BOBSHELL_API_KEY: ${{ secrets.BOBSHELL_API_KEY }}
+      DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+      DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+      REVIEW_MODE: ${{ vars.REVIEW_MODE || 'sdlc-review' }}
+      BRANCH: ${{ github.event.pull_request.head.ref }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+      MAIN_DIR: ${{ runner.temp }}/main
+      CI_DIR: ${{ runner.temp }}/main/tools/ci
+      OUT_DIR: ${{ runner.temp }}/review
+    steps:
+      - name: Check out PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Check out main (the protected rules)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-rules
+
+      - name: Pin rules, hooks, modes and checklist to main
+        # A PR must not change the rules that judge it. Replace .bob/ and
+        # governance/ in the PR checkout with main's copy. The PR's edits to
+        # them still show in pr.diff, and protected-paths fails them anyway.
+        run: |
+          mv main-rules "$MAIN_DIR"
+          rm -rf .bob governance
+          cp -a "$MAIN_DIR/.bob" "$MAIN_DIR/governance" .
+          rm -rf .bob/run
+          mkdir -p "$OUT_DIR"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies (the reviewer runs the tests)
+        run: pip install -r requirements.txt pytest
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Bob Shell
+        # The installer reads /dev/tty to pick a package manager, which hangs on
+        # a runner. --pm npm skips the prompt and installs with npm install -g.
+        # The installer has no version pin; the lab was built on 2.0.6.
+        run: |
+          curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash -s -- --pm npm
+          echo "$(npm prefix -g)/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Bob is on PATH
+        run: |
+          v="$(bob --version </dev/null)"
+          echo "bob version: $v"
+          echo "$v" | grep -q "2.0.6" || echo "::warning::Bob Shell is $v, the lab was built on 2.0.6"
+
+      - name: Ticket key, branch and diff
+        id: meta
+        run: |
+          key="${BRANCH##*/}"
+          if ! echo "$key" | grep -qE '^[A-Z][A-Z0-9]+-[0-9]+$'; then
+            key="$(echo "$BRANCH" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | tail -n 1 || true)"
+          fi
+          if [ -z "$key" ]; then
+            echo "::error::Branch '$BRANCH' has no ticket key. Use <name>/<KEY>, e.g. sam/LAB-1."
+            exit 1
+          fi
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+          # The hooks read the branch name, so leave detached HEAD.
+          git checkout -q -B "$BRANCH"
+          git fetch -q origin main
+          git diff origin/main...HEAD > pr.diff
+          echo "ticket $key, branch $BRANCH, diff $(wc -l < pr.diff) lines"
+
+      - name: Write lab.env for the hooks
+        # The lab hooks read lab.env and report this review session to the
+        # dashboard as the CI reviewer. Empty DASHBOARD_* = hooks stay silent.
+        run: |
+          umask 077
+          {
+            echo "LAB_USER=ci-reviewer"
+            echo "LAB_ROLE=ci-reviewer"
+            echo "LAB_TICKET=${{ steps.meta.outputs.key }}"
+            echo "LAB_CHANNEL=ci"
+            echo "DASHBOARD_URL=$DASHBOARD_URL"
+            echo "DASHBOARD_TOKEN=$DASHBOARD_TOKEN"
+          } > lab.env
+
+      - name: Bob review (fail closed)
+        id: review
+        env:
+          KEY: ${{ steps.meta.outputs.key }}
+        run: |
+          if [ -z "$BOBSHELL_API_KEY" ]; then
+            echo "::error::BOBSHELL_API_KEY is not set. The review cannot run, the gate fails closed."
+          fi
+          prompt="Review branch $BRANCH for ticket $KEY against plans/$KEY.md using the review skill. The diff is in pr.diff. End with the verdict block."
+          if [ "$REVIEW_MODE" != "sdlc-review" ]; then
+            # Fallback: plugin modes did not resolve headless. Put the review
+            # skill and the verdict format (both from main) in the prompt.
+            echo "::notice::REVIEW_MODE=$REVIEW_MODE: fallback, review skill inlined in the prompt"
+            prompt="$prompt
+
+          Follow this review skill:
+          $(cat .bob/plugins/bob-sdlc/skills/review/SKILL.md)
+
+          $(cat .bob/plugins/bob-sdlc/rules-sdlc-review/review-output.md)"
+          fi
+          start=$(date +%s)
+          rc=3
+          set +e
+          for attempt in 1 2; do
+            bob run --trust --accept-license --disable-mcp --disable-subagents \
+              --max-cost 3 --max-turns 40 -f json --mode "$REVIEW_MODE" \
+              "$prompt" </dev/null > "$OUT_DIR/review.json" 2> "$OUT_DIR/bob-stderr.txt"
+            bob_rc=$?
+            echo "bob run attempt $attempt exit $bob_rc"
+            tail -n 20 "$OUT_DIR/bob-stderr.txt"
+            python3 "$CI_DIR/parse_verdict.py" "$OUT_DIR/review.json" \
+              --markdown "$OUT_DIR/comment.md" \
+              --meta "Ticket $KEY, branch \`$BRANCH\`, mode \`$REVIEW_MODE\`, attempt $attempt, [run log]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
+              > "$OUT_DIR/verdict.json"
+            rc=$?
+            cat "$OUT_DIR/verdict.json"
+            # A real PASS or FAIL is final. Only a missing verdict is retried.
+            [ "$rc" -ne 3 ] && break
+            echo "No VERDICT line (attempt $attempt)."
+          done
+          set -e
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+
+      - name: Upload review output
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: bob-review-${{ github.event.pull_request.number }}
+          path: |
+            ${{ runner.temp }}/review/review.json
+            ${{ runner.temp }}/review/verdict.json
+            ${{ runner.temp }}/review/comment.md
+          if-no-files-found: ignore
+
+      - name: Post verdict as a sticky PR comment
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="$OUT_DIR/comment.md"
+          [ -s "$body" ] || printf '<!-- sdlc-gate:bob-review -->\n## SDLC gate: review\n\n**Verdict: ERROR** (the job failed before a verdict existed, the gate fails closed)\n' > "$body"
+          id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+                --jq '.[] | select(.body | contains("<!-- sdlc-gate:bob-review -->")) | .id' | tail -n 1)"
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F "body=@$body" > /dev/null
+            echo "updated comment $id"
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -F "body=@$body" > /dev/null
+            echo "created comment"
+          fi
+
+      - name: Report ci_result to the dashboard
+        if: always()
+        continue-on-error: true
+        env:
+          KEY: ${{ steps.meta.outputs.key }}
+          SECONDS_SPENT: ${{ steps.review.outputs.seconds }}
+          TESTS_PASSED: ${{ needs.tests.outputs.passed }}
+          TESTS_TOTAL: ${{ needs.tests.outputs.total }}
+        run: |
+          if [ -z "$DASHBOARD_URL" ] || [ -z "$DASHBOARD_TOKEN" ]; then
+            echo "dashboard: DASHBOARD_URL/DASHBOARD_TOKEN not set, skipping ci_result"
+            exit 0
+          fi
+          python3 - > "$OUT_DIR/ci_result.json" <<'PY'
+          import json, os
+          try:
+              v = json.load(open(os.path.join(os.environ["OUT_DIR"], "verdict.json")))
+          except Exception:
+              v = {"verdict": "ERROR", "findings": [], "blocking": 0}
+          def num(x):
+              try:
+                  return int(x)
+              except (TypeError, ValueError):
+                  return None
+          # The tests job count is deterministic; the reviewer's TESTS line is the fallback.
+          passed, total = num(os.environ.get("TESTS_PASSED")), num(os.environ.get("TESTS_TOTAL"))
+          if not total and v.get("tests_total") is not None:
+              passed, total = v.get("tests_passed"), v.get("tests_total")
+          print(json.dumps({
+              "kind": "ci_result",
+              "user": os.environ["PR_AUTHOR"],
+              "ticket": os.environ.get("KEY", ""),
+              "pr": int(os.environ["PR_NUMBER"]),
+              "data": {
+                  "tests_passed": passed or 0,
+                  "tests_total": total or 0,
+                  "verdict": v.get("verdict", "ERROR"),
+                  "findings": len(v.get("findings") or []),
+                  "blocking": v.get("blocking", 0),
+                  "seconds": num(os.environ.get("SECONDS_SPENT")) or 0,
+              },
+          }))
+          PY
+          cat "$OUT_DIR/ci_result.json"
+          curl -sS -m 15 --fail-with-body -X POST "${DASHBOARD_URL%/}/api/v1/lab/events" \
+            -H "Authorization: Bearer $DASHBOARD_TOKEN" -H "Content-Type: application/json" \
+            --data-binary "@$OUT_DIR/ci_result.json" \
+            || echo "dashboard: unreachable or refused, continuing (fail open)"
+
+      - name: Enforce the verdict
+        if: always()
+        env:
+          RC: ${{ steps.review.outputs.rc }}
+        run: |
+          case "$RC" in
+            0) echo "verdict PASS" ;;
+            2) echo "::error::verdict FAIL (see the PR comment)"; exit 1 ;;
+            *) echo "::error::no verdict, the gate fails closed (rc=${RC:-none})"; exit 1 ;;
+          esac
+
+  merged:
+    name: merged
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+      DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find the merged PR
+        id: pr
+        run: |
+          num="$(gh pr list --repo "$GITHUB_REPOSITORY" --search "$GITHUB_SHA" --state merged \
+                 --json number --jq '.[0].number // empty' || true)"
+          if [ -z "$num" ]; then
+            num="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+                   --jq '[.[] | select(.merged_at != null)][0].number // empty' || true)"
+          fi
+          if [ -z "$num" ]; then
+            echo "merged: no merged PR for $GITHUB_SHA (direct push to main), nothing to report"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          gh pr view "$num" --repo "$GITHUB_REPOSITORY" \
+            --json number,url,author,headRefName,additions,deletions,reviews,mergedBy > "$RUNNER_TEMP/pr.json"
+          head="$(jq -r .headRefName "$RUNNER_TEMP/pr.json")"
+          rounds="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow sdlc-gate.yml --branch "$head" \
+                    --event pull_request --limit 100 --json databaseId --jq 'length' || echo 1)"
+          key="${head##*/}"
+          echo "$key" | grep -qE '^[A-Z][A-Z0-9]+-[0-9]+$' \
+            || key="$(echo "$head" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | tail -n 1 || true)"
+          {
+            echo "found=true"
+            echo "number=$num"
+            echo "key=$key"
+            echo "url=$(jq -r .url "$RUNNER_TEMP/pr.json")"
+            echo "rounds=$rounds"
+          } >> "$GITHUB_OUTPUT"
+          echo "merged PR #$num, branch $head, ticket ${key:-none}, review rounds $rounds"
+
+      - name: Report merged to the dashboard
+        if: steps.pr.outputs.found == 'true'
+        continue-on-error: true
+        env:
+          KEY: ${{ steps.pr.outputs.key }}
+          ROUNDS: ${{ steps.pr.outputs.rounds }}
+        run: |
+          if [ -z "$DASHBOARD_URL" ] || [ -z "$DASHBOARD_TOKEN" ]; then
+            echo "dashboard: DASHBOARD_URL/DASHBOARD_TOKEN not set, skipping merged"
+            exit 0
+          fi
+          python3 - > "$RUNNER_TEMP/merged.json" <<'PY'
+          import json, os
+          pr = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "pr.json")))
+          approvers = [r["author"]["login"] for r in (pr.get("reviews") or [])
+                       if r.get("state") == "APPROVED" and r.get("author")]
+          approver = approvers[-1] if approvers else ((pr.get("mergedBy") or {}).get("login") or "")
+          try:
+              rounds = int(os.environ.get("ROUNDS") or 1)
+          except ValueError:
+              rounds = 1
+          print(json.dumps({
+              "kind": "merged",
+              "user": (pr.get("author") or {}).get("login", ""),
+              "ticket": os.environ.get("KEY", ""),
+              "pr": pr["number"],
+              "data": {
+                  "approver": approver,
+                  "review_rounds": rounds,
+                  "lines_changed": int(pr.get("additions", 0)) + int(pr.get("deletions", 0)),
+              },
+          }))
+          PY
+          cat "$RUNNER_TEMP/merged.json"
+          curl -sS -m 15 --fail-with-body -X POST "${DASHBOARD_URL%/}/api/v1/lab/events" \
+            -H "Authorization: Bearer $DASHBOARD_TOKEN" -H "Content-Type: application/json" \
+            --data-binary "@$RUNNER_TEMP/merged.json" \
+            || echo "dashboard: unreachable or refused, continuing (fail open)"
+
+      - name: Move the Jira ticket to Done
+        if: steps.pr.outputs.found == 'true'
+        continue-on-error: true
+        run: python3 tools/ci/jira_transition.py "${{ steps.pr.outputs.key }}" "${{ steps.pr.outputs.url }}"
