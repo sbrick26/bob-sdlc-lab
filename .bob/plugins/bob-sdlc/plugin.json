@@ -1,0 +1,8 @@
+{
+  "name": "bob-sdlc",
+  "displayName": "Bob SDLC",
+  "description": "Ticket to merged PR, the governed way: check my tickets, plan, build, review. Jira on behalf of the user, GitHub PRs, a governance dashboard.",
+  "version": "0.1.0",
+  "author": "Sequoia Power & Light platform team",
+  "keywords": ["sdlc", "governance", "jira", "github"]
+}

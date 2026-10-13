@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "atlassian": {
+      "type": "streamable-http",
+      "url": "https://mcp.atlassian.com/v2/mcp",
+      "alwaysAllow": [
+        "getAccessibleAtlassianResources",
+        "searchJiraIssuesUsingJql",
+        "getJiraIssue",
+        "searchConfluence",
+        "getConfluenceContent"
+      ],
+      "disabled": false
+    }
+  }
+}

@@ -2,7 +2,7 @@
 key_hint: FOPS-104
 title: Mask customer phone numbers and keep an audit trail
 assignee: alex
-touches:
+touches: [fieldops/report.py, fieldops/audit.py, fieldops/app.py, tests/test_report.py, tests/test_audit.py]
   - fieldops/report.py
   - fieldops/audit.py
   - tests/test_report.py

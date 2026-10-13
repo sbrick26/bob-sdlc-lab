@@ -1,0 +1,29 @@
+# The PR checklist. The pr-gate hook reads this before every git push and gh pr create.
+# Plain words in "says". Types: branch_not, file_exists, file_contains, marker, command_not_contains.
+checks:
+  - id: branch-not-main
+    says: "You are on a ticket branch, not main."
+    type: branch_not
+    value: main
+  - id: plan-exists
+    says: "A spec exists at plans/{KEY}.md."
+    type: file_exists
+    value: plans/{KEY}.md
+  - id: plan-approved
+    says: "The requester approved the spec."
+    type: file_contains
+    path: plans/{KEY}.md
+    value: "Requester approval: approved"
+  - id: tests-passed
+    says: "The tests passed in this session."
+    type: marker
+    value: .bob/run/tests-passed
+  - id: changelog
+    says: "CHANGELOG.md has an entry for {KEY}."
+    type: file_contains
+    path: CHANGELOG.md
+    value: "{KEY}"
+  - id: no-shortcuts
+    says: "No --no-verify and no --force."
+    type: command_not_contains
+    value: ["--no-verify", "--force"]

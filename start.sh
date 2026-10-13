@@ -1,0 +1,30 @@
+#!/bin/sh
+# Participant setup. Asks one question, writes lab.env, sets git identity, opens Bob IDE.
+set -e
+cd "$(dirname "$0")"
+NAMES="sam priya jordan alex"
+echo "Who are you? (sam, priya, jordan, alex, or your own first name)"
+printf "> "; read NAME
+NAME=$(echo "$NAME" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9')
+[ -n "$NAME" ] || { echo "need a name"; exit 1; }
+case " $NAMES " in *" $NAME "*) FULL="$(echo "$NAME" | sed 's/./\U&/') Lab";; *) FULL="$NAME";; esac
+DASH_URL="${DASHBOARD_URL:-}"
+DASH_TOKEN="${DASHBOARD_TOKEN:-}"
+if [ -z "$DASH_TOKEN" ]; then echo "Dashboard token from your card:"; printf "> "; read DASH_TOKEN; fi
+if [ -z "$DASH_URL" ]; then echo "Dashboard URL from your card:"; printf "> "; read DASH_URL; fi
+cat > lab.env <<ENV
+LAB_USER=$NAME
+LAB_ROLE=participant
+DASHBOARD_URL=$DASH_URL
+DASHBOARD_TOKEN=$DASH_TOKEN
+CONFLUENCE_SPACE=${CONFLUENCE_SPACE:-}
+ENV
+git config user.name "$FULL"
+git config user.email "$NAME@lab.sequoia.example"
+command -v python3 >/dev/null || { echo "python3 is required"; exit 1; }
+[ -d .venv ] || python3 -m venv .venv
+.venv/bin/pip install -q -r requirements.txt pytest
+echo "export LAB_USER=$NAME" > .bob/run/env.sh 2>/dev/null || true
+echo
+echo "Ready, $FULL. Open this folder in Bob IDE, then say: check my tickets"
+if [ "$(uname)" = Darwin ] && [ -d "/Applications/IBM Bob.app" ]; then open -a "IBM Bob" "$(pwd)"; fi

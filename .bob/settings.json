@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "python3 .bob/hooks/gov.py", "timeout": 5 } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "python3 .bob/hooks/gov.py", "timeout": 5 } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": ".*", "hooks": [ { "type": "command", "command": "python3 .bob/hooks/gov.py", "timeout": 5 } ] },
+      { "matcher": "^execute_command$", "hooks": [ { "type": "command", "command": "python3 .bob/hooks/pr_gate.py", "timeout": 5 } ] }
+    ],
+    "PostToolUse": [
+      { "matcher": ".*", "hooks": [ { "type": "command", "command": "python3 .bob/hooks/gov.py", "timeout": 5 } ] },
+      { "matcher": "^execute_command$", "hooks": [ { "type": "command", "command": "python3 .bob/hooks/test_marker.py", "timeout": 5 } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "python3 .bob/hooks/gov.py", "timeout": 5 } ] }
+    ]
+  }
+}
