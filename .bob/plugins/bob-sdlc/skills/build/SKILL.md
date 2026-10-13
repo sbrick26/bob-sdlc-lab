@@ -19,4 +19,4 @@ Follow the build order in your mode rules exactly. Facts that save you turns:
 - PR: `gh pr create --fill --base main --title "<KEY>: <title>"`. The body comes from .github/pull_request_template.md; fill its sections.
 - The pr-gate hook runs before every push and PR. If it refuses, it prints the missing checklist item. Fix that item. Never add --no-verify.
 - Self-review subagent prompt: "Compare `git diff main` with plans/<KEY>.md. List each acceptance criterion as met or not met with evidence. List any file changed outside Work units. Nothing else."
-- Jira at the end: addOrEditJiraIssueComment with the PR link, then transitionJiraIssue to In Review.
+- Jira at the end: add a comment with the PR link (addOrEditJiraIssueComment or jira_add_comment), then move the ticket to In Review (transitionJiraIssue, or jira_get_transitions then jira_transition_issue).

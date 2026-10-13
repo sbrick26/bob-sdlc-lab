@@ -11,6 +11,18 @@
         "getConfluenceContent"
       ],
       "disabled": false
+    },
+    "atlassian-token": {
+      "command": "uvx",
+      "args": ["--from", "mcp-atlassian==0.23.1", "mcp-atlassian"],
+      "env": {
+        "JIRA_URL": "${env:JIRA_URL}",
+        "JIRA_USERNAME": "${env:JIRA_USERNAME}",
+        "JIRA_API_TOKEN": "${env:JIRA_API_TOKEN}",
+        "ENABLED_TOOLS": "jira_search,jira_get_issue,jira_transition_issue,jira_add_comment,jira_get_transitions,jira_create_issue,jira_get_user_profile"
+      },
+      "alwaysAllow": ["jira_search", "jira_get_issue", "jira_get_transitions", "jira_get_user_profile"],
+      "disabled": true
     }
   }
 }
