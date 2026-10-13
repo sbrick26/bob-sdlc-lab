@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+*.pyc
+data
+tests
+tmp
+profiles
+scripts
+frontend/node_modules
+frontend/.vite
+frontend/.cache
+.DS_Store

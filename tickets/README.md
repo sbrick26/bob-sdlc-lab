@@ -8,3 +8,5 @@
 | 4 | [Mask customer phone numbers and keep an audit trail](04-compliance.md) | Alex | Compliance (masking, audit) |
 
 Rule: each ticket touches its own files so four people run in parallel.
+
+Ticket 5 (`05-guide-new-check.md`) is the guide's own ticket and the stretch exercise: extend the PR checklist.
