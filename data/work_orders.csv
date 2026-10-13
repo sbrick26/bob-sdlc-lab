@@ -1,0 +1,41 @@
+id,site,equipment,description,priority,status,crew,customer_name,customer_phone,created
+1001,North Substation,transformer,Oil leak at base of T2,1,open,,Maria Lopez,415-555-0142,2026-09-02
+1002,North Substation,feeder,Feeder 12 tripping under load,2,open,,James Carter,415-555-0177,2026-09-04
+1003,North Substation,switchgear,Breaker 4 will not rack in,1,open,,Linda Nguyen,510-555-0119,2026-09-07
+1004,North Substation,rack,Battery rack corrosion,3,open,,Robert Kim,415-555-0163,2026-09-10
+1005,North Substation,transformer,Cooling fan noise on T1,2,open,,Patricia Shah,650-555-0108,2026-09-15
+1006,North Substation,feeder,Replace cracked insulator F7,3,open,,Michael Brown,415-555-0131,2026-09-21
+1007,North Substation,switchgear,Annual relay test overdue,2,open,,Susan Patel,510-555-0154,2026-09-28
+1008,North Substation,transformer,Bushing hot spot found in IR scan,1,open,,David Wilson,408-555-0186,2026-10-03
+1009,North Substation,rack,Comms rack door lock broken,3,open,,Karen Davis,415-555-0125,2026-10-08
+1010,North Substation,feeder,Vegetation contact on F3,2,assigned,B,Thomas Moore,650-555-0193,2026-09-12
+1011,North Substation,transformer,Gauge reading stuck,3,closed,A,Nancy Taylor,415-555-0110,2026-09-03
+1012,South Substation,transformer,Tap changer alarm,1,open,,Daniel Anderson,510-555-0147,2026-09-05
+1013,South Substation,feeder,Feeder 2 voltage sag,2,open,,Lisa Thomas,408-555-0172,2026-09-11
+1014,South Substation,switchgear,SF6 pressure low,1,open,,Mark Jackson,510-555-0138,2026-09-18
+1015,South Substation,rack,UPS battery replacement,3,assigned,C,Betty White,650-555-0161,2026-09-09
+1016,South Substation,transformer,Paint and rust repair,3,closed,C,Paul Harris,510-555-0104,2026-09-01
+1017,South Substation,feeder,Pole hit by vehicle near F5,1,assigned,C,Sandra Martin,408-555-0129,2026-10-01
+1018,South Substation,switchgear,Panel light out,3,open,,Steven Garcia,510-555-0195,2026-10-06
+1019,South Substation,transformer,Oil sample due,2,open,,Donna Martinez,650-555-0116,2026-10-10
+1020,East Yard,switchgear,Pad mount door damaged,2,open,,Kevin Robinson,408-555-0150,2026-09-06
+1021,East Yard,rack,Spare parts rack inventory,3,open,,Carol Clark,408-555-0183,2026-09-13
+1022,East Yard,transformer,Spare transformer test before issue,2,assigned,D,Brian Rodriguez,510-555-0167,2026-09-17
+1023,East Yard,feeder,Cable reel damaged in storage,3,closed,D,Michelle Lewis,408-555-0102,2026-09-08
+1024,East Yard,switchgear,Grounding check after storm,1,open,,George Lee,650-555-0174,2026-09-24
+1025,East Yard,rack,Forklift damaged rack bay 3,2,open,,Dorothy Walker,408-555-0136,2026-10-02
+1026,East Yard,transformer,Unit 88 nameplate missing,3,open,,Edward Hall,510-555-0158,2026-10-09
+1027,West Depot,feeder,Feeder 9 fault locator reading,1,open,,Sharon Allen,650-555-0121,2026-09-03
+1028,West Depot,transformer,Overloaded pole top unit,1,open,,Ronald Young,408-555-0145,2026-09-14
+1029,West Depot,rack,Truck tool rack repair,3,open,,Kimberly King,650-555-0189,2026-09-19
+1030,West Depot,switchgear,Recloser not reporting,2,assigned,D,Jason Wright,408-555-0113,2026-09-23
+1031,West Depot,feeder,Tree trimming request F11,3,closed,B,Deborah Scott,650-555-0170,2026-09-16
+1032,West Depot,transformer,Customer reports humming,2,open,,Jeffrey Green,408-555-0132,2026-10-04
+1033,West Depot,switchgear,Fuse cabinet water ingress,1,open,,Laura Baker,650-555-0156,2026-10-07
+1034,West Depot,meter,Smart meter bank offline,2,open,,Ryan Adams,408-555-0198,2026-10-11
+1035,,transformer,"Unit reported by phone, site unknown",2,open,,Cynthia Nelson,415-555-0149,2026-09-26
+1036,,feeder,"Outage call, location not given",1,open,,Gary Hill,510-555-0181,2026-10-05
+1037,North Substation,switchgear,Arc flash label update,3,closed,A,Amy Ramirez,415-555-0115,2026-09-20
+1038,South Substation,feeder,Feeder 4 recloser count high,2,open,,Nicholas Campbell,510-555-0124,2026-10-12
+1039,East Yard,transformer,Leaking drum in containment,1,assigned,D,Angela Mitchell,408-555-0169,2026-09-29
+1040,North Substation,switchgear,Bus duct inspection,2,assigned,A,Eric Roberts,415-555-0187,2026-10-11

@@ -1,0 +1,5 @@
+id,name,home_site,skills
+A,Alpha Crew,North Substation,transformer;switchgear
+B,Bravo Crew,North Substation,feeder;rack;transformer
+C,Charlie Crew,South Substation,transformer;feeder
+D,Delta Crew,East Yard,switchgear;rack
