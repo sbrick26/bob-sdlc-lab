@@ -7,6 +7,7 @@ metadata:
 ---
 
 Ticket: $1 (take it from the branch name when empty). If you are not in the sdlc-review mode, switch to it first. End with the verdict block.
+
 # Review
 
 Inputs: a ticket key (from the branch name, pattern <name>/<KEY>) and a diff (`git diff main...HEAD` or the file given).

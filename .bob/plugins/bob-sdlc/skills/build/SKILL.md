@@ -7,6 +7,7 @@ metadata:
 ---
 
 Ticket: $1. If you are not in the sdlc-build mode, switch to it first. Stop after the PR is open and the Jira ticket is In Review.
+
 # Build
 
 Preconditions: plans/<KEY>.md exists and says "Requester approval: approved". If not, stop and say so.
