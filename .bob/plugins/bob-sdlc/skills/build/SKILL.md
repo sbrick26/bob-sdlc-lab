@@ -10,7 +10,7 @@ Ticket: $1. If you are not in the sdlc-build mode, switch to it first. Stop afte
 
 # Build
 
-Preconditions: plans/<KEY>.md exists and says "Requester approval: approved". If not, stop and say so.
+Preconditions: plans/<KEY>.md exists and says "Requester approval: approved". If it does not, read the ticket's Jira comments. If a comment from someone other than you starts with "Approved", write `Requester approval: approved by <author> in Jira on <YYYY-MM-DD>` and the comment link into the plan, then continue. If there is no approval anywhere, stop and say so.
 
 Follow the build order in your mode rules exactly. Facts that save you turns:
 

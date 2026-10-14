@@ -17,6 +17,6 @@ Ticket: $1. If you are not in the sdlc-plan mode, switch to it first.
 5. Post one Jira comment: the "What I understood" paragraph, the acceptance criteria, and the path plans/<KEY>.md. Keep it under 15 lines.
 6. Move the ticket to In Review (transitionJiraIssue, or jira_get_transitions then jira_transition_issue).
 7. If CONFLUENCE_SPACE is set in the environment, also create a Confluence page titled "<KEY> spec" under the parent page named "FieldOps specs" with the same content, using the Confluence create tool.
-8. Stop with: "Spec posted. Requester: reply approve, or tell me what to change."
+8. Stop with: "Spec posted. Requester: approve with a Jira comment that starts with Approved, or reply approve here, or tell me what to change."
 
-When the requester approves: set the line `Requester approval: approved by <name>` in the plan as plain text, no bold and no backticks (the PR gate matches it exactly), move the ticket back to In Progress, add the comment "Spec approved by <name>", and say "Run /build <KEY>."
+When the requester approves (in chat, or with a Jira comment that starts with "Approved"): set the line `Requester approval: approved by <name>` in the plan as plain text, no bold and no backticks (the PR gate matches it exactly); for a Jira approval write `Requester approval: approved by <name> in Jira on <YYYY-MM-DD>` and add the comment link on the next line, move the ticket back to In Progress, add the comment "Spec approved by <name>", and say "Run /build <KEY>."
