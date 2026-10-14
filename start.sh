@@ -18,6 +18,7 @@ if [ -z "$GH_LAB_TOKEN" ]; then echo "GitHub lab token from your card (input hid
 cat > lab.env <<ENV
 LAB_USER=$NAME
 LAB_ROLE=participant
+LAB_TEAM=${LAB_TEAM:-}
 DASHBOARD_URL=$DASH_URL
 DASHBOARD_TOKEN=$DASH_TOKEN
 CONFLUENCE_SPACE=${CONFLUENCE_SPACE:-}

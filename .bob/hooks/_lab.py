@@ -23,6 +23,8 @@ def lab_env():
                 k, v = line.split("=", 1)
                 env[k.strip()] = v.strip().strip('"').strip("'")
     env.update({k: v for k, v in os.environ.items() if k.startswith(("LAB_", "DASHBOARD_", "CONFLUENCE_"))})
+    if not env.get("LAB_TEAM"):  # lab personas belong to two demo teams
+        env["LAB_TEAM"] = {"sam": "Platform", "priya": "Platform", "jordan": "Field Apps", "alex": "Field Apps"}.get(env.get("LAB_USER", ""), "unassigned")
     return env
 
 

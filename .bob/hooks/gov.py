@@ -21,6 +21,7 @@ headers = {
     "X-Governance-Device": socket.gethostname(),
     "X-Lab-Ticket": _lab.ticket_key(env, payload),
     "X-Lab-Role": env.get("LAB_ROLE", "participant"),
+    "X-Governance-Team": env.get("LAB_TEAM", "unassigned"),
     "X-Lab-Branch": _lab.branch(),
     "X-Bob-Channel": env.get("LAB_CHANNEL", "ide"),
 }
