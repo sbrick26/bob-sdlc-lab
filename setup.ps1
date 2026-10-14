@@ -20,13 +20,14 @@ function Find-Python {
   if (Get-Command py -ErrorAction SilentlyContinue) { $cands += ,@('py','-3') }
   foreach ($c in $cands) {
     $exe = $c[0]; $rest = @(); if ($c.Count -gt 1) { $rest = $c[1..($c.Count - 1)] }
-    try { $out = & $exe @rest -c 'import sys;print(sys.executable if sys.version_info>=(3,10) else "")' 2>$null } catch { $out = $null }
+    try { $out = & $exe @rest -c 'import sys;print(sys.executable if sys.version_info>=(3,10) else str())' 2>$null } catch { $out = $null }
     $line = @($out | Where-Object { $_ -and $_.Trim() }) | Select-Object -First 1
     if ($line -and (Test-Path $line.Trim())) { return $line.Trim() }
   }
   return $null
 }
 $pyExe = Find-Python
+if (-not $pyExe) { Get-Command python,python3,py -All -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    seen: $($_.Source)" } }
 if ($pyExe) { Ok "python ($pyExe)" } else { Miss 'python 3.10+'; $needs += 'Python.Python.3.12' }
 if ($needs.Count -gt 0) {
   if (Has winget) {
