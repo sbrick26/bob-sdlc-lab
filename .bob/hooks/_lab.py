@@ -34,11 +34,22 @@ def branch():
         return ""
 
 
-def ticket_key(env=None):
+def ticket_key(env=None, payload=None):
+    """LAB_TICKET, else the branch name, else a key seen earlier in this session, else a key in this payload."""
     env = env or lab_env()
     if env.get("LAB_TICKET"):
         return env["LAB_TICKET"]
     m = KEY_RE.search(branch())
+    if m:
+        return m.group(1)
+    sid = str((payload or {}).get("session_id") or "")
+    cache = marker_path("ticket-" + re.sub(r"[^A-Za-z0-9_-]", "", sid)[:64]) if sid else None
+    if cache and os.path.exists(cache):
+        return open(cache).read().strip()
+    text = json.dumps(payload or {})
+    m = KEY_RE.search(text)
+    if m and cache:
+        open(cache, "w").write(m.group(1))
     return m.group(1) if m else ""
 
 

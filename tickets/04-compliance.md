@@ -1,16 +1,16 @@
 ---
-key_hint: FOPS-104
+key_hint: KAN-160
 title: Mask customer phone numbers and keep an audit trail
 assignee: alex
-touches: [fieldops/report.py, fieldops/audit.py, fieldops/app.py, tests/test_report.py, tests/test_audit.py]
+touches:
   - fieldops/report.py
   - fieldops/audit.py
+  - fieldops/app.py
   - tests/test_report.py
   - tests/test_audit.py
 does_not_touch:
   - fieldops/store.py
   - fieldops/assign.py
-  - fieldops/app.py
   - data/work_orders.csv
 ---
 

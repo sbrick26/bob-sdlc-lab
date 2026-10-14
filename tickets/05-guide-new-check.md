@@ -1,5 +1,5 @@
 ---
-key_hint: FOPS-105
+key_hint: KAN-161
 title: Every PR must say which site it affects
 assignee: guide
 touches:

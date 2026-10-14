@@ -16,7 +16,7 @@ Follow the build order in your mode rules exactly. Facts that save you turns:
 
 - Tests: `python -m pytest -q`. Python is `python3` on macOS. Create .venv with `./run.sh` if imports fail.
 - The store is CSV until ticket 2 lands. Tests must not change data/work_orders.csv; copy it to a temp dir in a fixture.
-- Branch: `git checkout -b $LAB_USER/<KEY>`; LAB_USER is in the environment. If it is empty, ask for the lab name.
+- Branch: `git checkout -b <lab name>/<KEY>`. The lab name is the LAB_USER line in lab.env at the repo root (read it). If the file is missing, ask.
 - PR: `gh pr create --fill --base main --title "<KEY>: <title>"`. The body comes from .github/pull_request_template.md; fill its sections.
 - The pr-gate hook runs before every push and PR. If it refuses, it prints the missing checklist item. Fix that item. Never add --no-verify.
 - Self-review subagent prompt: "Compare `git diff main` with plans/<KEY>.md. List each acceptance criterion as met or not met with evidence. List any file changed outside Work units. Nothing else."

@@ -19,7 +19,7 @@ headers = {
     "Authorization": "Bearer " + token,
     "X-Governance-User": env.get("LAB_USER") or os.environ.get("USER", "unknown"),
     "X-Governance-Device": socket.gethostname(),
-    "X-Lab-Ticket": _lab.ticket_key(env),
+    "X-Lab-Ticket": _lab.ticket_key(env, payload),
     "X-Lab-Role": env.get("LAB_ROLE", "participant"),
     "X-Lab-Branch": _lab.branch(),
     "X-Bob-Channel": env.get("LAB_CHANNEL", "ide"),

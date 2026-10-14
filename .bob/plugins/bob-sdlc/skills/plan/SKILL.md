@@ -19,4 +19,4 @@ Ticket: $1. If you are not in the sdlc-plan mode, switch to it first.
 7. If CONFLUENCE_SPACE is set in the environment, also create a Confluence page titled "<KEY> spec" under the parent page named "FieldOps specs" with the same content, using the Confluence create tool.
 8. Stop with: "Spec posted. Requester: reply approve, or tell me what to change."
 
-When the requester approves: set "Requester approval: approved by <name>" in the plan, and say "Run /build <KEY>."
+When the requester approves: set the line `Requester approval: approved by <name>` in the plan as plain text, no bold and no backticks (the PR gate matches it exactly), move the ticket back to In Progress, add the comment "Spec approved by <name>", and say "Run /build <KEY>."

@@ -1,8 +1,8 @@
 ## Ticket
-KEY-000: title
+KAN-000: title
 
 ## Spec
-plans/KEY-000.md, approved by: name
+plans/KAN-000.md, approved by: name
 
 ## What changed
 - one line per file

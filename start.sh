@@ -7,7 +7,8 @@ echo "Who are you? (sam, priya, jordan, alex, or your own first name)"
 printf "> "; read NAME
 NAME=$(echo "$NAME" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9')
 [ -n "$NAME" ] || { echo "need a name"; exit 1; }
-case " $NAMES " in *" $NAME "*) FULL="$(echo "$NAME" | sed 's/./\U&/') Lab";; *) FULL="$NAME";; esac
+CAP="$(printf %s "$NAME" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')"
+case " $NAMES " in *" $NAME "*) FULL="$CAP Lab";; *) FULL="$CAP";; esac
 DASH_URL="${DASHBOARD_URL:-}"
 DASH_TOKEN="${DASHBOARD_TOKEN:-}"
 if [ -z "$DASH_TOKEN" ]; then echo "Dashboard token from your card:"; printf "> "; read DASH_TOKEN; fi
@@ -22,9 +23,10 @@ ENV
 git config user.name "$FULL"
 git config user.email "$NAME@lab.sequoia.example"
 command -v python3 >/dev/null || { echo "python3 is required"; exit 1; }
+command -v gh >/dev/null || echo "WARNING: gh (GitHub CLI) is not installed; the build step opens the PR with gh."
+gh auth status -h github.com >/dev/null 2>&1 || echo "WARNING: gh is not signed in to github.com; run: gh auth login -h github.com"
 [ -d .venv ] || python3 -m venv .venv
 .venv/bin/pip install -q -r requirements.txt pytest
-echo "export LAB_USER=$NAME" > .bob/run/env.sh 2>/dev/null || true
 echo
 echo "Ready, $FULL. Open this folder in Bob IDE, then say: check my tickets"
 if [ "$(uname)" = Darwin ] && [ -d "/Applications/IBM Bob.app" ]; then open -a "IBM Bob" "$(pwd)"; fi

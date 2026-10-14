@@ -1,5 +1,5 @@
 ---
-key_hint: FOPS-103
+key_hint: KAN-159
 title: Let dispatch run work orders by asking in plain words
 assignee: jordan
 touches:
@@ -21,7 +21,7 @@ I want to say "show open orders at the North Substation and assign the top two t
 ## Done when
 
 - An MCP server gives three tools: `list_orders(site, status)`, `assign_order(id, crew)`, `close_order(id)`.
-- After it is added to `.bob/mcp.json`, Bob can call it from the IDE.
+- After it is added to your local `.bob/mcp.json` (that file is yours and is not committed), Bob can call it from the IDE.
 - The sentence above works: Bob lists the open North Substation orders and gives the top two to crew B.
 - The web screen shows the same change.
 - `python -m pytest tests/test_mcp_server.py` runs green.

@@ -7,7 +7,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _lab
 
 payload = _lab.read_payload()
-cmd = str((payload.get("tool_input") or {}).get("command", ""))
+tool = payload.get("tool_name", "")
+ti = payload.get("tool_input") or {}
+cmd = str(ti.get("command", ""))
+
+# Protected paths: no edits under .bob/, .github/, governance/, tools/ from a ticket session, and no
+# shell writes into .bob/run (the test marker). The marker must come from a real pytest run.
+PROTECTED = (".bob/", ".github/", "governance/", "tools/")
+path = str(ti.get("path") or ti.get("file_path") or "")
+if tool in ("write_file", "apply_diff", "insert_content", "search_and_replace") and re.sub(r"^(\./)+", "", path).startswith(PROTECTED):
+    print("Protected path: %s is changed only in a platform PR, not in a ticket branch." % path, file=sys.stderr); sys.exit(2)
+if tool == "execute_command" and re.search(r"\.bob/run\b", cmd) and re.search(r">|>>|\btee\b|\btouch\b|\bcp\b|\bmv\b|\bprintf\b|\becho\b|\brm\b", cmd):
+    print("Protected path: .bob/run is written only by the hooks. Run the tests instead.", file=sys.stderr); sys.exit(2)
+
 if not re.search(r"\bgit\s+push\b|\bgh\s+pr\s+create\b", cmd):
     sys.exit(0)
 
@@ -36,7 +48,7 @@ def load_checklist():
     return items
 
 
-key = _lab.ticket_key()
+key = _lab.ticket_key(payload=payload)
 br = _lab.branch()
 for it in load_checklist():
     t, val = it.get("type"), it.get("value")
@@ -47,8 +59,9 @@ for it in load_checklist():
     elif t == "file_exists":
         ok = bool(key) and os.path.exists(os.path.join(_lab.ROOT, sub(val)))
     elif t == "file_contains":
-        p = os.path.join(_lab.ROOT, it.get("path", ""))
-        ok = bool(key) and os.path.exists(p) and sub(val) in open(p, encoding="utf-8").read()
+        p = os.path.join(_lab.ROOT, sub(it.get("path", "")))
+        plain = re.sub(r"[*_`]", "", open(p, encoding="utf-8").read()) if os.path.exists(p) else ""
+        ok = bool(key) and sub(val) in plain
     elif t == "marker":
         ok = os.path.exists(os.path.join(_lab.ROOT, val))
     elif t == "command_not_contains":

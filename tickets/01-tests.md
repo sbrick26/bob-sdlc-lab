@@ -1,5 +1,5 @@
 ---
-key_hint: FOPS-101
+key_hint: KAN-157
 title: Lock in what the crew assignment service does today
 assignee: sam
 touches:
