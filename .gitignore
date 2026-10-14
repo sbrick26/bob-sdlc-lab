@@ -10,3 +10,4 @@ run/
 .bob/mcp.json
 lanes/
 .secrets/
+data/audit.log
