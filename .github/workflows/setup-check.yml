@@ -1,0 +1,80 @@
+# Verifies the participant setup scripts on real Windows, macOS and Linux machines.
+# Runs on demand and whenever a setup script changes on main. It does not use any repo secret.
+name: setup-check
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [setup.sh, setup.ps1, requirements.txt, .bob/hooks/**, .github/workflows/setup-check.yml]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]   # Windows PowerShell 5.1 and PowerShell 7
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    env:
+      LAB_PROFILE: '2'
+      DASHBOARD_TOKEN: setup-check-dummy
+      LAB_GH_TOKEN: setup-check-dummy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Run setup.ps1 (non-interactive)
+        run: |
+          if ('${{ matrix.shell }}' -eq 'powershell') { powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 } else { pwsh -NoProfile -File .\setup.ps1 }
+          if ($LASTEXITCODE -ne 0) { throw "setup.ps1 exited $LASTEXITCODE" }
+      - name: Check lab.env and git identity
+        run: |
+          Get-Content lab.env
+          if (-not (Select-String -Path lab.env -Pattern '^LAB_USER=priya$' -Quiet)) { throw 'LAB_USER not written' }
+          $n = git config user.name; if ($n -ne 'Priya Lab') { throw "git user.name is '$n'" }
+      - name: Check the python3 shortcut Bob hooks use
+        run: |
+          $env:Path = "$env:USERPROFILE\.bob-lab\bin;$env:Path"
+          cmd /c "python3 --version"; if ($LASTEXITCODE -ne 0) { throw 'python3 shortcut does not run' }
+      - name: Run a Bob hook the way Bob calls it on Windows (cmd /c)
+        run: |
+          $env:Path = "$env:USERPROFILE\.bob-lab\bin;$env:Path"
+          '{"hook_event_name":"SessionStart","source":"startup","session_id":"setup-check","cwd":"."}' | cmd /c "python3 .bob/hooks/gov.py"
+          if ($LASTEXITCODE -ne 0) { throw "gov.py exit $LASTEXITCODE (expected 0: dashboard rejects the dummy token, hook fails open)" }
+          '{"hook_event_name":"PreToolUse","tool_name":"execute_command","tool_input":{"command":"git push origin main"}}' | cmd /c "python3 .bob/hooks/pr_gate.py"
+          if ($LASTEXITCODE -ne 2) { throw "pr_gate.py exit $LASTEXITCODE (expected 2: push from main is refused)" }
+      - name: Check push credentials come from lab.env
+        run: |
+          $out = "protocol=https`nhost=github.com`n`n" | git credential fill
+          $out
+          if (-not ($out -match 'password=setup-check-dummy')) { throw 'credential helper did not return the lab token' }
+      - name: Run the app tests in the lab venv
+        run: |
+          .\.venv\Scripts\python.exe -m pytest -q
+          if ($LASTEXITCODE -notin 0,5) { throw "pytest exit $LASTEXITCODE" }
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      LAB_PROFILE: '4'
+      DASHBOARD_TOKEN: setup-check-dummy
+      LAB_GH_TOKEN: setup-check-dummy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run setup.sh (non-interactive)
+        run: sh setup.sh </dev/null
+      - name: Check lab.env, git identity, credentials, hooks, tests
+        run: |
+          grep -qx 'LAB_USER=alex' lab.env
+          test "$(git config user.name)" = "Alex Lab"
+          printf 'protocol=https\nhost=github.com\n\n' | git credential fill | grep -q 'password=setup-check-dummy'
+          echo '{"hook_event_name":"SessionStart","source":"startup","session_id":"setup-check","cwd":"."}' | python3 .bob/hooks/gov.py
+          set +e; echo '{"hook_event_name":"PreToolUse","tool_name":"execute_command","tool_input":{"command":"git push origin main"}}' | python3 .bob/hooks/pr_gate.py; rc=$?; set -e
+          test "$rc" = 2
+          .venv/bin/python -m pytest -q || test $? = 5

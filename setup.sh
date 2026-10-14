@@ -26,9 +26,10 @@ if [ -n "$need_install" ]; then
 fi
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' || { say "Python 3.10 or newer is needed."; exit 1; }
 if [ "$(uname)" = Darwin ] && [ ! -d "/Applications/IBM Bob.app" ]; then
-  miss "IBM Bob IDE (install it from https://bob.ibm.com, sign in once, then run ./setup.sh again)"; exit 1
+  miss "IBM Bob IDE (install it from https://bob.ibm.com and sign in once; setup continues)"
+else
+  ok "IBM Bob IDE"
 fi
-ok "IBM Bob IDE"
 
 say ""
 say "2. Who are you?"
@@ -44,8 +45,10 @@ say "     3) Jordan Lab   Field Apps"
 say "     4) Alex Lab     Field Apps"
 NAME=""
 while [ -z "$NAME" ]; do
+  if [ -n "${LAB_PROFILE:-}" ]; then CHOICE="$LAB_PROFILE"; LAB_PROFILE=""; else
   if [ -n "$CUR_N" ]; then printf "   Enter 1-4, or press Enter to keep %s: " "$CUR_N"; else printf "   Enter 1-4: "; fi
   read CHOICE; if [ -z "$CHOICE" ]; then CHOICE="$CUR_N"; fi
+  fi
   case "$CHOICE" in 1) NAME=sam;; 2) NAME=priya;; 3) NAME=jordan;; 4) NAME=alex;; *) say "   Please enter 1, 2, 3 or 4.";; esac
 done
 CAP="$(printf %s "$NAME" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')"

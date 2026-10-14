@@ -58,11 +58,13 @@ Write-Host "     2) Priya Lab    Platform"
 Write-Host "     3) Jordan Lab   Field Apps"
 Write-Host "     4) Alex Lab     Field Apps"
 $profiles = @{ '1' = @('sam','KAN-157'); '2' = @('priya','KAN-158'); '3' = @('jordan','KAN-159'); '4' = @('alex','KAN-160') }
+if ($env:LAB_PROFILE -and $profiles.ContainsKey($env:LAB_PROFILE)) { $choice = $env:LAB_PROFILE } else {
 do {
   $prompt = if ($curN) { "   Enter 1-4, or press Enter to keep $curN" } else { '   Enter 1-4' }
   $choice = Read-Host $prompt
   if (-not $choice -and $curN) { $choice = $curN }
 } until ($profiles.ContainsKey($choice))
+}
 $Name = $profiles[$choice][0]; $Ticket = $profiles[$choice][1]
 $Full = ($Name.Substring(0,1).ToUpper() + $Name.Substring(1)) + ' Lab'
 
