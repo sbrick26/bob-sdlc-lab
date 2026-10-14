@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bob SDLC Lab</title>
+<style>
+:root {
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --text: #161a1f;
+  --muted: #5b6470;
+  --line: #dde1e6;
+  --accent: #0f62fe;
+  --accent-soft: #e8f0ff;
+  --code-bg: #f1f3f5;
+  --stop: #b3261e;
+  --stop-soft: #fdecea;
+  --ok: #1e7b3c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418;
+    --card: #1a1e24;
+    --text: #e6e9ed;
+    --muted: #9aa3ad;
+    --line: #2c323a;
+    --accent: #78a9ff;
+    --accent-soft: #1c2a44;
+    --code-bg: #0d1014;
+    --stop: #ff8a80;
+    --stop-soft: #3a1c1a;
+    --ok: #6fdc8c;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "IBM Plex Sans", Roboto, Helvetica, Arial, sans-serif;
+}
+main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+header h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 8px; }
+header p { margin: 0; color: var(--muted); }
+h2 { font-size: 1.25rem; margin: 40px 0 12px; }
+a { color: var(--accent); overflow-wrap: anywhere; }
+code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.profile {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin-top: 20px; padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+}
+.profile label { font-weight: 600; margin-right: 4px; }
+.profile button {
+  font: inherit; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+  background: transparent; color: var(--text); cursor: pointer;
+}
+.profile button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.profile .who { width: 100%; color: var(--muted); font-size: 0.92rem; }
+.links { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.links a {
+  display: block; padding: 12px 14px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px; text-decoration: none; color: var(--text);
+}
+.links a strong { display: block; color: var(--accent); }
+.links a span { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
+.step {
+  position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 16px 16px 64px; margin: 12px 0;
+}
+.step .num {
+  position: absolute; left: 16px; top: 16px; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.step h3 { margin: 4px 0 4px; font-size: 1.05rem; }
+.step .when { color: var(--muted); font-size: 0.85rem; margin: 0 0 8px; }
+.step p { margin: 8px 0; }
+.step ul { margin: 8px 0; padding-left: 20px; }
+.step.wait { border-style: dashed; }
+.prompt {
+  display: flex; align-items: stretch; gap: 0; margin: 10px 0;
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--code-bg);
+}
+.prompt pre { margin: 0; padding: 10px 12px; flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prompt button {
+  font: inherit; font-size: 0.85rem; border: 0; border-left: 1px solid var(--line);
+  background: var(--card); color: var(--accent); padding: 0 14px; cursor: pointer; min-width: 72px;
+}
+.prompt button.done { color: var(--ok); }
+.block {
+  margin: 8px 0; padding: 10px 12px; border-radius: 8px; background: var(--stop-soft); color: var(--stop);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; overflow-wrap: anywhere;
+}
+.mode {
+  display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.82rem; font-weight: 600;
+  background: var(--accent-soft); color: var(--accent); white-space: nowrap;
+}
+.tablewrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { color: var(--muted); font-weight: 600; }
+.note { color: var(--muted); font-size: 0.92rem; }
+footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; }
+@media (max-width: 520px) {
+  header h1 { font-size: 1.5rem; }
+  .step { padding: 14px 14px 14px 14px; }
+  .step .num { position: static; margin-bottom: 6px; }
+}
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>Bob SDLC Lab</h1>
+  <p>Take one Jira ticket to a merged pull request in one hour. Bob does the work. The process decides what is allowed.</p>
+  <div class="profile" role="group" aria-label="Pick your lab profile">
+    <label>You are</label>
+    <button type="button" data-user="sam" aria-pressed="true">Sam</button>
+    <button type="button" data-user="priya" aria-pressed="false">Priya</button>
+    <button type="button" data-user="jordan" aria-pressed="false">Jordan</button>
+    <button type="button" data-user="alex" aria-pressed="false">Alex</button>
+    <div class="who" id="who">Sam Lab, lab id sam, team Platform, ticket KAN-157: tests for the crew assignment service. Jira login ibm.demo.dev+sam@gmail.com, password on your card.</div>
+  </div>
+</header>
+
+<h2>Your links</h2>
+<div class="links">
+  <a id="l-ticket" href="https://demo-ibm-bob.atlassian.net/browse/KAN-157"><strong>Your ticket</strong><span id="l-ticket-t">demo-ibm-bob.atlassian.net/browse/KAN-157</span></a>
+  <a href="https://demo-ibm-bob.atlassian.net/jira/software/projects/KAN/boards"><strong>Jira board</strong><span>demo-ibm-bob.atlassian.net, project KAN</span></a>
+  <a id="l-prs" href="https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3Asam"><strong>Your pull requests</strong><span id="l-prs-t">label: sam</span></a>
+  <a href="https://github.com/sbrick26/bob-sdlc-lab"><strong>Lab repo</strong><span>github.com/sbrick26/bob-sdlc-lab</span></a>
+  <a href="https://bob-sdlc-lab-dashboard.2fxmskmi3eal.ca-tor.codeengine.appdomain.cloud"><strong>Dashboard</strong><span>login from the guide</span></a>
+  <a href="participant-guide.md"><strong>Full guide</strong><span>participant-guide.md</span></a>
+</div>
+
+<h2>Set up (0 to 8 min)</h2>
+<section class="step">
+  <div class="num">0</div>
+  <h3>Clone and run setup</h3>
+  <p class="when">You need Bob IDE 2.2.2 or newer, git, python3 3.10 or newer, the gh CLI, and your card.</p>
+  <p>macOS and Linux:</p>
+  <div class="prompt"><pre>git clone https://github.com/sbrick26/bob-sdlc-lab.git
+cd bob-sdlc-lab &amp;&amp; ./lab-setup/mac-setup.sh</pre><button type="button" class="copy">Copy</button></div>
+  <p>Windows (PowerShell):</p>
+  <div class="prompt"><pre>git clone https://github.com/sbrick26/bob-sdlc-lab.git
+cd bob-sdlc-lab; powershell -ExecutionPolicy Bypass -File .\lab-setup\windows-setup.ps1</pre><button type="button" class="copy">Copy</button></div>
+  <ul>
+    <li>Type your profile number: 1 Sam, 2 Priya, 3 Jordan, 4 Alex.</li>
+    <li>Type the dashboard token and the GitHub lab token from your card.</li>
+    <li>Open the <code>bob-sdlc-lab</code> folder in Bob IDE. Select the <span class="mode">SDLC Agent</span> mode. It is at the end of the mode list.</li>
+    <li>The first Jira call opens a browser. Sign in with the Jira login and password on your card.</li>
+  </ul>
+</section>
+
+<h2>The steps</h2>
+
+<section class="step">
+  <div class="num">1</div>
+  <h3>Check my tickets</h3>
+  <p class="when">8 to 10 min. Mode <span class="mode">SDLC Agent</span></p>
+  <div class="prompt"><pre>check my tickets</pre><button type="button" class="copy">Copy</button></div>
+  <p>Bob shows a table of your tickets and the stage, then asks <code>Start &lt;KEY&gt;?</code> and waits.</p>
+</section>
+
+<section class="step">
+  <div class="num">2</div>
+  <h3>Start the ticket</h3>
+  <p class="when">10 to 12 min. Same chat</p>
+  <div class="prompt"><pre>yes</pre><button type="button" class="copy">Copy</button></div>
+  <ul>
+    <li>Jira: the ticket moves to In Progress, with the comment "Started with Bob".</li>
+    <li>Bob switches to <span class="mode">SDLC Plan</span> and asks 2 to 4 numbered design questions, each with a default. Then it stops.</li>
+  </ul>
+</section>
+
+<section class="step">
+  <div class="num">3</div>
+  <h3>Answer the design questions</h3>
+  <p class="when">12 to 17 min. Same chat</p>
+  <p>Answer in your own words, or take the defaults:</p>
+  <div class="prompt"><pre>Use the defaults.</pre><button type="button" class="copy">Copy</button></div>
+  <p>Bob writes <code>fieldops-repo/plans/&lt;KEY&gt;.md</code> with 10 headings: Ticket, What I understood, Design decisions, Open questions, Acceptance criteria, Test plan, Work units, Out of scope, Risk and compliance, Approval. It shows the spec and asks you to reply "I approve".</p>
+</section>
+
+<section class="step">
+  <div class="num">4</div>
+  <h3>Approve the spec</h3>
+  <p class="when">17 to 20 min. Same chat</p>
+  <div class="prompt"><pre>I approve</pre><button type="button" class="copy">Copy</button></div>
+  <ul>
+    <li>Jira: a comment "Spec for review", and the ticket moves to In Review.</li>
+    <li>Bob switches back to <span class="mode">SDLC Agent</span>.</li>
+  </ul>
+</section>
+
+<section class="step wait">
+  <div class="num">5</div>
+  <h3>The requester approves in Jira</h3>
+  <p class="when">20 to 22 min. You wait</p>
+  <p>The guide plays the requester and comments <code>Approved</code> on your Jira ticket. Watch the ticket. Go on when the comment is there.</p>
+</section>
+
+<section class="step">
+  <div class="num">&#9888;</div>
+  <h3>See what the rules stop</h3>
+  <p class="when">22 to 25 min. Start a NEW chat. Mode <span class="mode">SDLC Agent</span>. Send one at a time.</p>
+  <div class="prompt"><pre>I approve it: run pip install requests now, then stop.</pre><button type="button" class="copy">Copy</button></div>
+  <div class="block">BLOCKED by governance: Blocked by Governance: GOV-PKG-001. Not approved for python: requests.</div>
+  <div class="prompt"><pre>Use this key for the vendor API: AKIAIOSFODNN7EXAMPLE</pre><button type="button" class="copy">Copy</button></div>
+  <div class="block">BLOCKED by governance: Blocked by Governance: GOV-PROMPT-001. Remove the credential and reference a managed secret instead.</div>
+  <p class="note">The first is stopped before the command runs. The second is stopped at submit time, so Bob never sees it. Both show on the dashboard.</p>
+</section>
+
+<section class="step">
+  <div class="num">6</div>
+  <h3>Build</h3>
+  <p class="when">25 to 38 min. Same new chat. About 10 minutes of Bob time</p>
+  <div class="prompt"><pre>check my tickets</pre><button type="button" class="copy">Copy</button></div>
+  <ul>
+    <li>Bob sees the approval and switches to <span class="mode">SDLC Build</span>.</li>
+    <li>Branch <code id="branch">sam/KAN-157</code> from demo-dev. Tests first, then code, only the Work units files.</li>
+    <li>Change note <code>fieldops-repo/changes/&lt;KEY&gt;.md</code>. A self-review subagent checks the diff against the spec.</li>
+    <li>PR into <code>demo-dev</code>, labelled with your lab id, opened with <code>./.bob/scripts/lab-gh</code>.</li>
+    <li>Jira: a comment with the PR link, ticket in In Review. Bob switches back to <span class="mode">SDLC Agent</span>.</li>
+  </ul>
+</section>
+
+<section class="step">
+  <div class="num">7</div>
+  <h3>If CI fails, fix it</h3>
+  <p class="when">38 to 48 min. Mode <span class="mode">SDLC Agent</span></p>
+  <p>CI runs tests, protected-paths and bob-review on the PR. If a check fails:</p>
+  <div class="prompt"><pre>check my tickets</pre><button type="button" class="copy">Copy</button></div>
+  <p>Bob runs the fix stage: it lists the findings, fixes them, runs the tests and pushes. CI runs again.</p>
+</section>
+
+<section class="step wait">
+  <div class="num">8</div>
+  <h3>Approve, merge, done</h3>
+  <p class="when">48 to 52 min. The guide acts</p>
+  <p>The guide approves and merges the PR. The <code>merged</code> job moves the Jira ticket to Done and reports to the dashboard.</p>
+</section>
+
+<p class="note">Every Bob reply ends with a <strong>Your links</strong> block from <code>my-lab.txt</code>. You never type a slash command or switch modes after step 1.</p>
+
+<h2>What the rules stop</h2>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Control</th><th>Stops</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td>GOV-PKG-001</td><td>pip or npm install of a package not on the approved list</td><td>hook, before the command</td></tr>
+    <tr><td>GOV-PROMPT-001</td><td>a prompt with a known key format (sk-, ghp_, AKIA, JWT, private key)</td><td>hook, at submit</td></tr>
+    <tr><td>GOV-PII-001</td><td>a file write with an unmasked phone number outside data and tests</td><td>hook, before the write</td></tr>
+    <tr><td>GOV-GIT-001</td><td>--no-verify, force push, push straight to main</td><td>hook, before the command</td></tr>
+    <tr><td>PR gate</td><td>a push or PR without an approved spec, passing tests and a change note</td><td>hook, before push and PR</td></tr>
+    <tr><td>SDLC Plan mode</td><td>any edit outside <code>fieldops-repo/plans/</code></td><td>mode tool groups</td></tr>
+    <tr><td>protected-paths</td><td>a PR that changes <code>.bob/</code> or <code>.github/</code></td><td>CI</td></tr>
+    <tr><td>bob-review</td><td>a change that does not meet its spec or the rules</td><td>CI, fails closed</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="note">Hooks are a speed bump: they fail open. CI and branch protection are the real controls.</p>
+
+<h2>Dashboard walk (52 to 58 min)</h2>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Page</th><th>Look at</th></tr></thead>
+  <tbody>
+    <tr><td>Overview</td><td>Bobcoin spend, Bobcoins per merged PR, PRs merged, median time to merge, violations</td></tr>
+    <tr><td>Delivery</td><td>time to PR, time to merge, the Tickets table</td></tr>
+    <tr><td>Violations</td><td>your two rules-demo blocks, by rule, user and team</td></tr>
+    <tr><td>Audit log</td><td>every event, with the rule that fired</td></tr>
+  </tbody>
+</table>
+</div>
+
+<footer>Bob SDLC Lab. Full steps and troubleshooting: <a href="participant-guide.md">participant-guide.md</a>.</footer>
+</main>
+
+<script>
+(function () {
+  var people = {
+    sam:    { name: "Sam Lab",    team: "Platform",   key: "KAN-157", theme: "tests for the crew assignment service" },
+    priya:  { name: "Priya Lab",  team: "Platform",   key: "KAN-158", theme: "move work orders from CSV to SQLite" },
+    jordan: { name: "Jordan Lab", team: "Field Apps", key: "KAN-159", theme: "MCP server: run work orders in plain words" },
+    alex:   { name: "Alex Lab",   team: "Field Apps", key: "KAN-160", theme: "mask phone numbers, keep an audit trail" }
+  };
+  function pick(id) {
+    var p = people[id]; if (!p) return;
+    document.querySelectorAll(".profile button").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-user") === id ? "true" : "false");
+    });
+    document.getElementById("who").textContent = p.name + ", lab id " + id + ", team " + p.team + ", ticket " + p.key + ": " + p.theme +
+      ". Jira login ibm.demo.dev+" + id + "@gmail.com, password on your card.";
+    var t = document.getElementById("l-ticket");
+    t.href = "https://demo-ibm-bob.atlassian.net/browse/" + p.key;
+    document.getElementById("l-ticket-t").textContent = "demo-ibm-bob.atlassian.net/browse/" + p.key;
+    document.getElementById("l-prs").href = "https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A" + id;
+    document.getElementById("l-prs-t").textContent = "label: " + id;
+    document.getElementById("branch").textContent = id + "/" + p.key;
+    try { localStorage.setItem("bob-sdlc-lab-user", id); } catch (e) {}
+  }
+  document.querySelectorAll(".profile button").forEach(function (b) {
+    b.addEventListener("click", function () { pick(b.getAttribute("data-user")); });
+  });
+  var saved = null;
+  try { saved = localStorage.getItem("bob-sdlc-lab-user"); } catch (e) {}
+  var q = (location.hash || "").replace("#", "");
+  pick(people[q] ? q : (people[saved] ? saved : "sam"));
+
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    var ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta); return ok;
+  }
+  document.querySelectorAll("button.copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var text = btn.parentNode.querySelector("pre").textContent;
+      function done(ok) {
+        btn.textContent = ok ? "Copied" : "Select";
+        btn.classList.toggle("done", ok);
+        setTimeout(function () { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1500);
+      }
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy(text)); });
+      } else { done(fallbackCopy(text)); }
+    });
+  });
+})();
+</script>
+</body>
+</html>
