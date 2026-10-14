@@ -56,6 +56,8 @@ jobs:
           python-version: "3.12"
       - name: Install
         run: pip install -r requirements.txt pytest pyyaml
+      - name: Check the plugin, CI scripts and settings files
+        run: python -m pytest -q .github/scripts/tests
       - name: Run pytest
         id: pytest
         run: |
