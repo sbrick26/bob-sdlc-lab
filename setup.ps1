@@ -97,7 +97,11 @@ git config user.name "$Full"
 git config user.email "$Name@lab.sequoia.example"
 # Push as the shared lab account, for this folder only. Git for Windows runs this helper with its bundled sh.
 git config credential.https://github.com.helper ""
-git config --add credential.https://github.com.helper '!f() { echo username=x-access-token; echo "password=$(sed -n s/^LAB_GH_TOKEN=//p "$(git rev-parse --show-toplevel)/lab.env")"; }; f'
+# Windows PowerShell 5.1 strips embedded double quotes from native arguments, so keep the helper logic in a file.
+$gitDir = (Resolve-Path (git rev-parse --git-dir)).Path -replace '\\','/'
+$helper = "$gitDir/lab-credential.sh"
+[IO.File]::WriteAllText($helper, "#!/bin/sh`nroot=`"`$(git rev-parse --show-toplevel)`"`necho username=x-access-token`necho `"password=`$(sed -n 's/^LAB_GH_TOKEN=//p' `"`$root/lab.env`")`"`n")
+git config --add credential.https://github.com.helper "!sh '$helper'"
 git fetch -q origin demo-dev 2>$null
 
 Write-Host ""
