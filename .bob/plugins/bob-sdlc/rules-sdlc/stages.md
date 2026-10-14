@@ -12,5 +12,6 @@ Work out the stage from Jira and GitHub every time, in this order. Never trust m
 | 6. Waiting for approval | Pull request open, all checks green, no change requests | Say it is waiting for the guide to approve and merge. Give the links. Stop |
 | 7. Done | Pull request merged or Jira status Done | Say it is done and point to the dashboard. Stop |
 
-Find the pull request with `./scripts/lab-gh pr list --head <user>/<KEY> --state all --json number,url,state,mergedAt`.
+Only pull requests into demo-dev opened after the ticket's most recent "Started with Bob" comment count; older pull requests (for example into main) are history.
+Find the pull request with `./scripts/lab-gh pr list --head <user>/<KEY> --base demo-dev --state all --json number,url,state,mergedAt,createdAt`.
 Read checks with `./scripts/lab-gh pr checks <number>` and review comments with `./scripts/lab-gh pr view <number> --comments`.
