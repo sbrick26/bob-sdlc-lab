@@ -112,6 +112,35 @@ def test_git_block_through_hook():
     assert "--no-verify" in body["reason"]
 
 
+def test_package_rule_ignores_quotes_across_split_points_in_ordinary_commands(monkeypatch):
+    monkeypatch.delenv("LAB_PACKAGE_ALLOWLIST", raising=False)
+    allowlist = {"python": lab_python_allowlist(), "node": []}
+    cases = [
+        ("git add tests/x.py && git status --short", None),
+        ("echo 'a|b'", None),
+        (".venv/bin/pip install requests", "requests"),
+        ("pip install 'requests>=2'", "requests"),
+        ('pip install "unterminated', "unparseable-install-command"),
+    ]
+    for command, finding in cases:
+        ecosystem, found = package_install_findings({"command": command}, allowlist)
+        if finding is None:
+            assert (ecosystem, found) == (None, []), command
+        else:
+            assert ecosystem == "python" and finding in found, command
+    # Through the hook (allowlist-independent cases; the suite-wide allowlist may include requests).
+    for index, (command, decision) in enumerate([
+        ("git add tests/x.py && git status --short", "allowed"),
+        ("echo 'a|b'", "allowed"),
+        ('pip install "unterminated', "blocked"),
+    ]):
+        body = hook("PreToolUse", tool_name="execute_command", tool_use_id=f"pkg-split-{index}",
+                    tool_input={"command": command}).json()
+        assert body["decision"] == decision, command
+        if decision == "blocked":
+            assert "GOV-PKG-001" in body["reason"]
+
+
 def test_lab_headers_are_stored_filtered_and_faceted():
     response = hook("UserPromptSubmit", headers=lab_headers(user="facet-user", ticket="lab-905", role="guide"),
                     prompt="Plan the ticket")

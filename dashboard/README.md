@@ -24,6 +24,8 @@ This folder is the Bob SDLC lab dashboard. It is the Bob Governance service
 - **`LAB_MODE=1`**: policy publish activates the policy in the object store
   without MDM. Dashboard basic auth still applies.
 - **Lab page**: the first item in the console navigation.
+- **Install-rule parsing**: a command segment that `shlex` cannot parse is a `GOV-PKG-001` block only when it looks like an install (`pip`, `npm`, `pnpm`, `yarn`, `python -m pip`); other segments, such as `echo 'a|b'`, are ignored.
+- **Reset**: `.venv/bin/python scripts/reset-lab.py` deletes every object under `COS_PREFIX` in the local store (`DATA_DIR/objects`) and prints each one; in COS mode it only prints the `ibmcloud cos` delete command.
 
 ## Run it locally
 

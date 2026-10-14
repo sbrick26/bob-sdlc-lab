@@ -249,6 +249,9 @@ def _package_name(raw: str, ecosystem: str) -> str:
     return value.split("@", 1)[0].lower()
 
 
+INSTALL_HINT = re.compile(r"\b(pip3?|npm|pnpm|yarn)\b|python3? -m pip")
+
+
 def package_install_findings(
     value: Any, allowlist: dict[str, list[str]] | None = None
 ) -> tuple[str | None, list[str]]:
@@ -263,8 +266,11 @@ def package_install_findings(
         try:
             tokens = shlex.split(segment)
         except ValueError:
-            findings["python"].add("unparseable-install-command")
-            detected.append("python")
+            # Only an install-looking segment is a finding; a quote that spans a
+            # split point in an ordinary command (git, echo) is not.
+            if INSTALL_HINT.search(segment):
+                findings["python"].add("unparseable-install-command")
+                detected.append("python")
             continue
         for index, token in enumerate(tokens):
             base = PurePath(token).name.lower()
