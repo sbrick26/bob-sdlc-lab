@@ -54,8 +54,10 @@ jobs:
           exit 0
       - name: Check push credentials come from lab.env
         run: |
-          $out = "protocol=https`nhost=github.com`n`n" | git credential fill
-          $out
+          [IO.File]::WriteAllText("$PWD\cred.txt", "protocol=https`nhost=github.com`n`n")
+          $out = cmd /c "git credential fill < cred.txt"
+          ($out -join "`n") -replace 'password=.*','password=<hidden>'
+          $out = $out -join "`n"
           if (-not ($out -match 'password=setup-check-dummy')) { throw 'credential helper did not return the lab token' }
       - name: Run the app tests in the lab venv
         run: |
