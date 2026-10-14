@@ -9,6 +9,9 @@ plans/KAN-000.md, approved by: name
 ## What changed
 - one line per file
 
+## Time
+Hours this would have taken without Bob: 
+
 ## Proof
 - tests: `python -m pytest -q` result
 - self-review: criteria met n/n
