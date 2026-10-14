@@ -42,7 +42,7 @@ export function UsagePage() {
     const paceFactor = data.granularity === 'day' ? 1 : data.granularity === 'week' ? 7 : 30;
     const pace = data.budgets.daily_pace == null ? null : data.budgets.daily_pace * paceFactor;
     const burn = [...data.budgets.teams].sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0) || a.name.localeCompare(b.name)).slice(0, 10).map((item) => ({
-      label: item.name, value: item.pct ?? 0, display: `${(item.bobcoins ?? 0).toFixed(2)} / ${item.budget?.toFixed(0) ?? '—'} BC`,
+      label: item.name, value: item.pct ?? 0, display: percent(item.pct),
       color: (item.pct ?? 0) >= 100 ? '#da1e28' : (item.pct ?? 0) >= 80 ? '#f1c21b' : colors[item.name] ?? '#4589ff',
       tip: { title: item.name, rows: [{ label: 'Spent this month', value: bobcoins(item.bobcoins), sub: rate == null ? undefined : usdText(item.bobcoins, rate) }, { label: 'Budget', value: bobcoins(item.budget) }, { label: 'Used', value: percent(item.pct) }] },
     }));
@@ -64,19 +64,19 @@ export function UsagePage() {
     ...(data.automation && !userFilter ? [{ ...data.automation, user: data.automation.label, team: '—', budget_pct: null, automation: true }] : []),
   ];
   const userColumns: Column<UserRow>[] = [
-    { key: 'user', header: 'User', render: (row) => row.user, sort: (row) => row.user },
+    { key: 'user', header: 'User', width: '12rem', render: (row) => row.user, sort: (row) => row.user },
     { key: 'team', header: 'Team', render: (row) => row.team, sort: (row) => row.team },
     { key: 'sessions', header: 'Sessions', numeric: true, render: (row) => count(row.sessions), sort: (row) => row.sessions },
     { key: 'turns', header: 'Turns', numeric: true, render: (row) => count(row.turns), sort: (row) => row.turns },
     { key: 'coins', header: 'Bobcoins', numeric: true, render: (row) => bobcoins(row.bobcoins), sort: (row) => row.bobcoins },
     { key: 'usd', header: 'USD', numeric: true, render: (row) => usdText(row.bobcoins, rate) },
-    { key: 'tokens', header: 'Context tokens', numeric: true, render: (row) => count(row.tokens), sort: (row) => row.tokens },
-    { key: 'budget', header: 'User budget (this month)', render: (row) => <BudgetCell spent={row.budget_bobcoins ?? null} budget={row.budget ?? null} pct={row.budget_pct} />, sort: (row) => row.budget_pct },
+    { key: 'tokens', header: 'Context tokens', numeric: true, width: '8.5rem', render: (row) => count(row.tokens), sort: (row) => row.tokens },
+    { key: 'budget', header: 'User budget (this month)', width: '15rem', render: (row) => <BudgetCell spent={row.budget_bobcoins ?? null} budget={row.budget ?? null} pct={row.budget_pct} />, sort: (row) => row.budget_pct },
   ];
   const nearColumns: Column<BudgetEntry>[] = [
     { key: 'name', header: 'Name', render: (row) => row.name, sort: (row) => row.name },
     { key: 'kind', header: 'Kind', render: (row) => (row.kind === 'person' ? 'User' : 'Team'), sort: (row) => row.kind },
-    { key: 'budget', header: 'Budget used (this month)', render: (row) => <BudgetCell spent={row.bobcoins} budget={row.budget} pct={row.pct} />, sort: (row) => row.pct },
+    { key: 'budget', header: 'Budget used (this month)', width: '15rem', render: (row) => <BudgetCell spent={row.bobcoins} budget={row.budget} pct={row.pct} />, sort: (row) => row.pct },
     { key: 'level', header: '', render: (row) => <Tag size="sm" type={LEVEL_TAG[row.level ?? ''] ?? 'gray'}>{row.level === 'over' ? 'Over' : 'Near'}</Tag> },
     { key: 'left', header: 'Bobcoins left', numeric: true, render: (row) => bobcoins(row.left), sort: (row) => row.left },
   ];
@@ -85,11 +85,11 @@ export function UsagePage() {
   const outlierColumns: Column<Outlier>[] = [
     { key: 'user', header: 'User', render: (row) => <a href={`#/usage?user=${encodeURIComponent(row.user)}`}>{row.user}</a>, sort: (row) => row.user },
     { key: 'ticket', header: 'Ticket', render: (row) => (row.ticket ? <a href={jira ? `${jira}/browse/${row.ticket}` : `#/audit?ticket=${encodeURIComponent(row.ticket)}`} target={jira ? '_blank' : undefined} rel="noreferrer">{row.ticket}</a> : '—'), sort: (row) => row.ticket },
-    { key: 'session', header: 'Session', render: (row) => <a href={`#/audit?session=${encodeURIComponent(row.session_id)}`}><code>{row.session}</code></a> },
-    { key: 'tokens', header: 'Context tokens', numeric: true, render: (row) => count(row.tokens), sort: (row) => row.tokens },
+    { key: 'session', header: 'Session', width: '7rem', render: (row) => <a href={`#/audit?session=${encodeURIComponent(row.session_id)}`}><code>{row.session}</code></a> },
+    { key: 'tokens', header: 'Context tokens', numeric: true, width: '8.5rem', render: (row) => count(row.tokens), sort: (row) => row.tokens },
     { key: 'turns', header: 'Turns', numeric: true, render: (row) => count(row.turns), sort: (row) => row.turns },
     { key: 'coins', header: 'Bobcoins', numeric: true, render: (row) => bobcoins(row.bobcoins), sort: (row) => row.bobcoins },
-    { key: 'flags', header: 'Over the limit on', render: (row) => <span className="flag-tags">{row.flags.map((flag) => <Tag key={flag} size="sm" type="magenta">{FLAG_LABEL[flag] ?? flag}</Tag>)}</span> },
+    { key: 'flags', header: 'Over the limit on', width: '14rem', render: (row) => <span className="flag-tags">{row.flags.map((flag) => <Tag key={flag} size="sm" type="magenta">{FLAG_LABEL[flag] ?? flag}</Tag>)}</span> },
   ];
   const spendTip = (day: string | undefined): TipSpec => {
     const item = data.daily.find((entry) => entry.day === day);
@@ -134,7 +134,7 @@ export function UsagePage() {
         </ChartPanel>
       </section>
       <section className="chart-grid">
-        <ChartPanel title="Budget burn, this month" empty={!charts.burn.length} emptyDetail="Set LAB_BUDGETS to track team budgets.">
+        <ChartPanel title="Budget burn, this month" empty={!charts.burn.length} emptyDetail="No team budgets are configured.">
           <HBarList label="Budget burn" items={charts.burn} max={110} markers={[{ value: 50, label: '50%', tone: 'neutral' }, { value: 80, label: '80%', tone: 'warning' }, { value: 100, label: '100%', tone: 'danger' }]} />
         </ChartPanel>
         <article className="panel chart-panel">

@@ -26,26 +26,40 @@ This folder is the Bob SDLC lab dashboard. It is the Bob Governance service
   `GOV-GIT-001` blocks unsafe git commands.
 - **`LAB_MODE=1`**: policy publish activates the policy in the object store
   without MDM. Dashboard basic auth still applies.
-- **Console pages**: Overview, Cost & budgets, Delivery, Performance,
-  Violations (with a Rules tab) and Audit log. Each reads one summary
-  endpoint (`/api/v1/{overview,cost,delivery,performance,violations,rules}/summary`)
+- **Console pages**: Overview, Usage, Delivery, Performance, Violations
+  (with a Rules tab) and Audit log. Each reads one summary endpoint
+  (`/api/v1/{overview,cost,delivery,performance,violations,rules}/summary`)
   that takes `since`, `until` (local dates), `team` and `tz_offset`. KPI deltas
-  compare with the prior period of the same length. The audit log exports
-  `/api/v1/events.csv` and `/api/v1/events.jsonl` (metadata only, detail
-  redacted). `/api/v1/stream` is a Server-Sent Events feed of ingested events
-  that the console uses for live updates. The policy draft and publish API
-  stays, but the console no longer links it.
+  compare with the prior period of the same length. Up to 31 days the charts
+  bucket by day, up to 183 by ISO week, beyond by month. Charts with an entity
+  axis show the top 10 plus "Other (N)"; rate rankings need 20 actions (or 3
+  merged PRs). The audit log takes `session`, exports `/api/v1/events.csv` and
+  `/api/v1/events.jsonl` (metadata only, detail redacted), and
+  `/api/v1/sessions/{id}` summarises one Bob session with Bobcoins per turn.
+  `/api/v1/stream` is a Server-Sent Events feed of ingested events that the
+  console uses for live updates. The policy draft and publish API stays, but
+  the console no longer links it.
+- **Masking at ingest**: prompts, tool input and output and Bob's answers are
+  redacted (credential formats, labelled secrets) and then long token-like
+  strings and US phone numbers (except in files under `data/` and `tests/`)
+  become `[masked N chars]` before anything is written to the object store.
 - **Teams**: hook events carry `X-Governance-Team` (stored as `team`, default
   `unassigned`). CI and lab events take the team of the ticket's owner.
 - **Budgets**: `LAB_BUDGETS` JSON, for example
   `{"teams":{"Platform":100,"Field Apps":100},"default_person":50,"period":"month"}`
   (each team has two users, so a team budget is 2 x 50). Burn is month to date;
   80% is "near limit", 100% is "over".
-- **Performance**: tool time pairs PreToolUse and PostToolUse by
+- **Performance**: answer time is a prompt to the next Stop in the same
+  session (it includes time waiting for approvals). Governance delay felt by
+  users is `X-Hook-Prev-Ms`, the laptop-side round trip of the previous
+  governance call. Targets come from `PERF_TARGETS`, default
+  `{"answer_s":120,"governance_ms":1000,"tool_success_pct":95}`. Tool time pairs PreToolUse and PostToolUse by
   `tool_use_id`; a PreToolUse with no PostToolUse within 10 minutes is a tool
   failure (blocked calls excluded). Turn time is the first prompt after the
   previous Stop to the next Stop in the same session. Governance check time is
   this server's own processing time per `/api/v1/hooks` call (`check_ms`).
+- **Links**: set `JIRA_BASE_URL` (for example `https://example.atlassian.net`)
+  to link ticket keys to `/browse/KEY`.
 - **USD**: USD = Bobcoins x `BOBCOIN_USD_RATE` (default `0.50`, the IBM
   enterprise pack price of $500 per 1,000 Bobcoins; `off` turns USD off). The
   Usage & ROI page can override the rate in the browser.
@@ -68,6 +82,8 @@ not estimate them:
 ```bash
 ./run-local.sh                         # http://localhost:8080  user governance  password lab
 .venv/bin/python scripts/seed-lab.py   # four people, eight tickets over four days
+.venv/bin/python scripts/seed-scale.py # 60 users, 6 teams, 400 tickets over 90 days
+LAB_SEED=scale ./run-local.sh          # start and seed in one go (lab or scale)
 curl -u governance:lab localhost:8080/api/v1/lab/board
 ```
 

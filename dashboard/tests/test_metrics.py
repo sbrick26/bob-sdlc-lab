@@ -184,10 +184,10 @@ def test_violations_summary_breaks_down_blocks():
     assert all(row["decision"] == "blocked" and len(row["excerpt"]) <= 80 for row in mine)
     assert not any(secret in row["excerpt"] or "0199" in row["excerpt"] for row in mine)
     assert "by_control_point" not in summary
-    assert any(item["user"] == user and item["blocked"] == 4 for item in summary["by_user"]["items"])
+    assert any(item["user"] == user and item["violations"] == 4 for item in summary["by_user"]["items"])
     # 4 actions is below the 20-action minimum: not ranked, but counted.
-    assert not any(item["user"] == user for item in summary["block_rate_by_user"]["items"])
-    assert summary["block_rate_by_user"]["unranked"] >= 1
+    assert not any(item["user"] == user for item in summary["rate_by_user"]["items"])
+    assert summary["rate_by_user"]["unranked"] >= 1
     rules = client.get("/api/v1/rules/summary", auth=AUTH).json()["rules"]
     assert [rule["rule_id"] for rule in rules] == list(RULES)
     git = next(rule for rule in rules if rule["rule_id"] == "GOV-GIT-001")

@@ -29,6 +29,9 @@
 | `COS_API_KEY`, `COS_RESOURCE_INSTANCE_ID` | cos | COS credentials, from a secret (or a service binding). |
 | `PORT` | no | Set by Code Engine. The image listens on `${PORT:-8080}`. |
 | `BOBCOIN_USD_RATE` | no | USD per Bobcoin for the USD columns. Default `0.50` (IBM enterprise pack price); `off` hides USD. |
+| `LAB_BUDGETS` | no | Monthly Bobcoin budgets, e.g. `{"teams":{"Platform":100,"Field Apps":100},"default_person":50,"period":"month"}`. |
+| `PERF_TARGETS` | no | Performance targets, default `{"answer_s":120,"governance_ms":1000,"tool_success_pct":95}`. |
+| `JIRA_BASE_URL` | no | Links ticket keys to `<url>/browse/KEY`. |
 | `SIMPLEMDM_API_KEY` | no | Only when `LAB_MODE` is off and policy publish must reach MDM. |
 
 ## Commands

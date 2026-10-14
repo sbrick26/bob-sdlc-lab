@@ -2,7 +2,7 @@ import { useState, type MouseEvent } from 'react';
 import { EmptyState } from './States';
 import type { TipSpec } from '../theme';
 
-export interface HBar { label: string; value: number; display: string; color: string; tip?: TipSpec; href?: string }
+export interface HBar { label: string; value: number; display: string; color: string; tip?: TipSpec; href?: string; other?: boolean }
 export interface Marker { value: number; label: string; tone: 'neutral' | 'warning' | 'danger' }
 
 /** Tooltip card at a screen point, 12 px right of the pointer, flipped left near the right edge. */
@@ -35,16 +35,19 @@ function TipRowView({ row, extra = '' }: { row: TipSpec['rows'][number]; extra?:
 export function HBarList({ items, max, markers, empty, label }: { items: HBar[]; max?: number; markers?: Marker[]; empty?: string; label: string }) {
   const [hover, setHover] = useState<{ index: number; x: number; y: number } | null>(null);
   if (!items.length) return <EmptyState title="No data yet" detail={empty ?? 'Nothing in this period.'} />;
-  const top = Math.max(max ?? 0, ...items.map((item) => item.value), ...(markers ?? []).map((marker) => marker.value)) || 1;
+  // Scale to the largest named row; an "Other (N)" row never squashes the named rows.
+  const top = Math.max(max ?? 0, ...items.filter((item) => !item.other).map((item) => item.value), ...(markers ?? []).map((marker) => marker.value)) || 1;
+  const width = (value: number) => `${Math.min(value / top, 1) * 100}%`;
   const move = (index: number) => (event: MouseEvent) => setHover({ index, x: event.clientX, y: event.clientY });
   return (
     <div className="hbar" role="list" aria-label={label} onMouseLeave={() => setHover(null)}>
       {items.map((item, index) => (
-        <div className="hbar__row" role="listitem" key={item.label} onMouseMove={move(index)} onMouseEnter={move(index)}>
-          <span className="hbar__label" title={item.label}>{item.href ? <a href={item.href}>{item.label}</a> : item.label}</span>
+        <div className={`hbar__row${item.other ? ' hbar__row--other' : ''}${item.href ? ' hbar__row--link' : ''}`} role="listitem" key={item.label} onMouseMove={move(index)} onMouseEnter={move(index)}
+          onClick={item.href ? () => { window.location.hash = item.href!.replace(/^#/, ''); } : undefined}>
+          <span className="hbar__label" title={item.label}>{item.href ? <a href={item.href} onClick={(event) => event.stopPropagation()}>{item.label}</a> : item.label}</span>
           <span className="hbar__track">
-            <span className="hbar__fill" style={{ width: `${(item.value / top) * 100}%`, background: item.color }} />
-            <span className="hbar__value" style={{ left: `calc(${(item.value / top) * 100}% + 6px)` }}>{item.display}</span>
+            <span className="hbar__fill" style={{ width: width(item.value), background: item.other ? undefined : item.color }} />
+            <span className="hbar__value" style={{ left: `calc(${width(item.value)} + 6px)` }}>{item.display}</span>
             {markers?.map((marker) => <span key={marker.value} className={`hbar__marker hbar__marker--${marker.tone}`} style={{ left: `${(marker.value / top) * 100}%` }} />)}
           </span>
         </div>

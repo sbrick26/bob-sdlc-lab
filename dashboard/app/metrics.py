@@ -356,7 +356,7 @@ def rules_summary(rows: list[dict[str, Any]], catalog: dict[str, dict[str, Any]]
 # ---------------------------------------------------------------- CSV
 
 CSV_COLUMNS = (
-    ("time", "occurred_at"), ("user", "user_name"), ("team", "team"), ("ticket", "lab_ticket"), ("role", "lab_role"),
+    ("time", "occurred_at"), ("user", "user_name"), ("team", "team"), ("ticket", "lab_ticket"),
     ("event_type", "hook_event"), ("control_point", None), ("tool", "tool_name"), ("decision", "decision"),
     ("rule_id", "rule_id"), ("rule_name", "rule_name"), ("severity", "severity"), ("outcome", "outcome"),
     ("detail", None), ("session", "session_id"), ("bobcoins", "lab_cost"), ("usd", None),
@@ -383,6 +383,10 @@ def export_records(rows: list[dict[str, Any]], redact_fn: Callable[[Any], tuple[
                 record[name] = re.sub(r"\s+", " ", mask(str(row.get("detail") or ""), redact_fn))[:200]
             elif name == "usd":
                 record[name] = to_usd(row.get("lab_cost"), rate)
+            elif name == "event_type":
+                record[name] = str(row.get("hook_event") or "").removeprefix("lab.")
+            elif name == "user" and is_ci(row):
+                record[name] = CI_LABEL
             else:
                 record[name] = row.get(field or "")
         out.append(record)

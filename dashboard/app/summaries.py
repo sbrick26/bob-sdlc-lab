@@ -335,6 +335,8 @@ def _kpis(view: View) -> dict[str, float | None]:
         "sessions": view.sessions(view.people_hooks),
         "median_minutes_to_merge": round(statistics.median(merged_minutes), 1) if merged_minutes else None,
         "blocked": sum(row.get("decision") == "blocked" for row in view.win),
+        # Violations: every rule hit, blocked or flagged.
+        "violations": len(violation_rows(view.win)),
         "flagged": sum(row.get("decision") == "observed" and bool(row.get("rule_id")) for row in view.win),
         "first_try_pass_rate_pct": round(passed / len(reviewed) * 100, 1) if reviewed else None,
         "tokens": _sum(view.win_deltas, "tokens"),
@@ -506,6 +508,36 @@ def _tool_pairs(view: View) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
     return pairs, failures
 
 
+def tool_outcomes(rows: list[dict[str, Any]]) -> dict[str, str]:
+    """Outcome of each PreToolUse: "blocked", "completed" (a PostToolUse within 10 minutes) or "failed".
+
+    A PreToolUse younger than 10 minutes with no PostToolUse yet has no outcome.
+    """
+    posts: dict[str, list[datetime]] = defaultdict(list)
+    for row in rows:
+        if row.get("hook_event") == "PostToolUse" and row.get("tool_use_id"):
+            parsed = _parse(row.get("occurred_at"))
+            if parsed:
+                posts[row["tool_use_id"]].append(parsed)
+    now = datetime.now(timezone.utc)
+    result: dict[str, str] = {}
+    for row in rows:
+        if row.get("hook_event") != "PreToolUse":
+            continue
+        if row.get("decision") == "blocked":
+            result[str(row.get("event_id"))] = "blocked"
+            continue
+        started = _parse(row.get("occurred_at"))
+        if not started:
+            continue
+        done = any(started <= end <= started + timedelta(minutes=TOOL_TIMEOUT_MINUTES) for end in posts.get(row.get("tool_use_id") or "", []))
+        if done:
+            result[str(row.get("event_id"))] = "completed"
+        elif (now - started).total_seconds() > TOOL_TIMEOUT_MINUTES * 60:
+            result[str(row.get("event_id"))] = "failed"
+    return result
+
+
 def _turns(view: View) -> list[dict[str, Any]]:
     """Turn = first UserPromptSubmit after the previous Stop, to the next Stop, per session."""
     by_session: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -530,8 +562,12 @@ def _performance_numbers(view: View) -> dict[str, float | None]:
     pairs, failures = _tool_pairs(view)
     turns = _turns(view)
     checks = [float(row["check_ms"]) for row in view.hooks if row.get("check_ms") is not None]
+    rtt = [float(row["hook_rtt_prev_ms"]) for row in view.hooks if row.get("hook_rtt_prev_ms") is not None]
     attempts = len(pairs) + len(failures)
     return {
+        "rtt_p50_ms": percentile(rtt, 50),
+        "rtt_p95_ms": percentile(rtt, 95),
+        "tool_success_pct": round(len(pairs) / attempts * 100, 1) if attempts else None,
         "tool_p50_s": percentile([pair["seconds"] for pair in pairs], 50),
         "tool_p95_s": percentile([pair["seconds"] for pair in pairs], 95),
         "turn_p50_s": percentile([turn["seconds"] for turn in turns], 50),
@@ -593,7 +629,7 @@ def team_table(view: View) -> list[dict[str, Any]]:
             "budget_bobcoins": burn["bobcoins"] if burn else None,
             "budget_level": burn["level"] if burn else None,
             "prs_merged": numbers["prs_merged"], "median_minutes_to_merge": numbers["median_minutes_to_merge"],
-            "blocked": numbers["blocked"], "first_try_pass_rate_pct": numbers["first_try_pass_rate_pct"],
+            "violations": numbers["violations"], "first_try_pass_rate_pct": numbers["first_try_pass_rate_pct"],
         })
     return result
 
@@ -654,9 +690,9 @@ def merge_distribution(view: View) -> list[dict[str, Any]]:
 def _team_violations(view: View) -> list[dict[str, Any]]:
     counts: dict[str, int] = defaultdict(int)
     for row in view.win:
-        if row.get("decision") == "blocked":
+        if row.get("rule_id") and row.get("decision") in {"blocked", "observed"}:
             counts[row["team"]] += 1
-    return [{"team": team, "blocked": count} for team, count in sorted(counts.items())]
+    return [{"team": team, "violations": count} for team, count in sorted(counts.items())]
 
 
 # ---------------------------------------------------------------- page summaries
@@ -675,8 +711,9 @@ def overview(rows: list[dict[str, Any]], scope: Scope) -> dict[str, Any]:
     spend = _fold_teams(spend)
     rules: dict[str, dict[str, Any]] = {}
     for row in violation_rows(view.win):
-        entry = rules.setdefault(row["rule_id"], {"rule_id": row["rule_id"], "rule_name": row.get("rule_name"), "severity": row.get("severity"), "blocked": 0, "observed": 0})
+        entry = rules.setdefault(row["rule_id"], {"rule_id": row["rule_id"], "rule_name": row.get("rule_name"), "severity": row.get("severity"), "blocked": 0, "observed": 0, "violations": 0})
         entry[row["decision"]] += 1
+        entry["violations"] += 1
     return {
         **_common(view, kpis, days),
         "days": [bucket.isoformat() for bucket in view.buckets()],
@@ -684,9 +721,9 @@ def overview(rows: list[dict[str, Any]], scope: Scope) -> dict[str, Any]:
         "spend_by_team": [{"day": day, "team": team, "bobcoins": round(value, 4)} for (day, team), value in sorted(spend.items())],
         "daily_active": view.daily_active(),
         "by_team": team_table(view),
-        "violations_by_team": top_n(_team_violations(view), "blocked", "team"),
+        "violations_by_team": top_n(_team_violations(view), "violations", "team"),
         "merge_median_per_day": merge_median_per_day(view),
-        "violations_by_rule": top_n([item for item in rules.values() if item["blocked"]], "blocked", "rule_id"),
+        "violations_by_rule": top_n(list(rules.values()), "violations", "rule_id"),
     }
 
 
@@ -866,42 +903,99 @@ def roi(view: View, merged: list[dict[str, Any]], reviewed: list[dict[str, Any]]
     }
 
 
+DEFAULT_PERF_TARGETS = {"answer_s": 120.0, "governance_ms": 1000.0, "tool_success_pct": 95.0}
+
+
+def perf_targets() -> dict[str, float]:
+    """PERF_TARGETS JSON, e.g. {"answer_s": 120, "governance_ms": 1000, "tool_success_pct": 95}."""
+    try:
+        raw = json.loads(os.environ.get("PERF_TARGETS") or "{}")
+    except ValueError:
+        raw = {}
+    targets = dict(DEFAULT_PERF_TARGETS)
+    if isinstance(raw, dict):
+        targets.update({key: float(value) for key, value in raw.items() if key in targets and isinstance(value, (int, float))})
+    return targets
+
+
+def perf_status(typical: float | None, slow: float | None, target: float, higher_is_better: bool = False) -> str | None:
+    """green: the typical value meets the target and so does the slow tail; amber: only the tail misses; red: typical misses."""
+    if typical is None:
+        return None
+    meets = (lambda value: value >= target) if higher_is_better else (lambda value: value <= target)
+    if not meets(typical):
+        return "red"
+    if slow is not None and not meets(slow):
+        return "amber"
+    return "green"
+
+
+def _stats(values: list[float]) -> dict[str, float | int | None]:
+    return {"p50": percentile(values, 50), "p95": percentile(values, 95), "p99": percentile(values, 99), "samples": len(values)}
+
+
 def performance(rows: list[dict[str, Any]], scope: Scope) -> dict[str, Any]:
     view, kpis, days = kpis_with_deltas(rows, scope)
+    targets = perf_targets()
     pairs, failures = _tool_pairs(view)
     turns = _turns(view)
+    answer = [turn["seconds"] for turn in turns]
+    rtt = [float(row["hook_rtt_prev_ms"]) for row in view.hooks if row.get("hook_rtt_prev_ms") is not None]
+    checks = [float(row["check_ms"]) for row in view.hooks if row.get("check_ms") is not None]
+    attempts = len(pairs) + len(failures)
+    success = round(len(pairs) / attempts * 100, 1) if attempts else None
+
     by_tool: dict[str, list[float]] = defaultdict(list)
     for pair in pairs:
         by_tool[pair["tool"]].append(pair["seconds"])
     failed_by_tool: dict[str, int] = defaultdict(int)
     for failure in failures:
         failed_by_tool[failure["tool"]] += 1
-    tools = [
-        {"tool": tool, "calls": len(values) + failed_by_tool.get(tool, 0), "p50_s": percentile(values, 50),
-         "p95_s": percentile(values, 95), "failures": failed_by_tool.get(tool, 0)}
-        for tool, values in by_tool.items()
-    ] + [
-        {"tool": tool, "calls": count, "p50_s": None, "p95_s": None, "failures": count}
-        for tool, count in failed_by_tool.items() if tool not in by_tool
-    ]
-    series = []
-    for bucket in view.buckets():
-        day = bucket
-        day_turns = [turn["seconds"] for turn in turns if view.bucket_of(turn["at"]) == bucket.isoformat()]
-        day_pairs = sum(1 for pair in pairs if view.bucket_of(pair["at"]) == bucket.isoformat())
-        day_failures = sum(1 for failure in failures if view.bucket_of(failure["at"]) == bucket.isoformat())
-        attempts = day_pairs + day_failures
-        series.append({
-            "day": day.isoformat(), "turn_p95_s": percentile(day_turns, 95),
-            "tool_failure_rate_pct": round(day_failures / attempts * 100, 1) if attempts else None,
+    tools = []
+    for tool in set(by_tool) | set(failed_by_tool):
+        runs = len(by_tool.get(tool, [])) + failed_by_tool.get(tool, 0)
+        tools.append({
+            "tool": tool, "runs": runs, "failures": failed_by_tool.get(tool, 0),
+            "success_pct": round(len(by_tool.get(tool, [])) / runs * 100, 1) if runs else None,
+            "typical_s": percentile(by_tool.get(tool, []), 50), **{f"{key}_s": value for key, value in _stats(by_tool.get(tool, [])).items() if key != "samples"},
         })
+    tools = top_n(tools, "runs", "tool")
+
+    series = []
+    worst_day_success = None
+    for bucket in view.buckets():
+        key = bucket.isoformat()
+        day_answer = [turn["seconds"] for turn in turns if view.bucket_of(turn["at"]) == key]
+        day_pairs = sum(1 for pair in pairs if view.bucket_of(pair["at"]) == key)
+        day_failures = sum(1 for failure in failures if view.bucket_of(failure["at"]) == key)
+        day_rtt = [float(row["hook_rtt_prev_ms"]) for row in view.hooks if row.get("hook_rtt_prev_ms") is not None and view.bucket_of(row.get("occurred_at")) == key]
+        day_success = round(day_pairs / (day_pairs + day_failures) * 100, 1) if day_pairs + day_failures else None
+        if day_success is not None:
+            worst_day_success = day_success if worst_day_success is None else min(worst_day_success, day_success)
+        series.append({
+            "day": key, "answer_typical_s": percentile(day_answer, 50), "answer_slow_s": percentile(day_answer, 95), "answers": len(day_answer),
+            "tool_success_pct": day_success, "tool_runs": day_pairs + day_failures,
+            "governance_typical_ms": percentile(day_rtt, 50), "governance_slow_ms": percentile(day_rtt, 95),
+        })
+    answer_stats, rtt_stats = _stats(answer), _stats(rtt)
     return {
         **_common(view, kpis, days),
-        "tools": sorted(tools, key=lambda item: (-(item["p95_s"] or 0), item["tool"])),
+        "targets": targets,
+        "cards": {
+            "answer": {"typical_s": answer_stats["p50"], "slow_s": answer_stats["p95"],
+                       "status": perf_status(answer_stats["p50"], answer_stats["p95"], targets["answer_s"])},
+            "governance": {"typical_ms": rtt_stats["p50"], "slow_ms": rtt_stats["p95"],
+                           "status": perf_status(rtt_stats["p50"], rtt_stats["p95"], targets["governance_ms"])},
+            "tools": {"success_pct": success, "worst_day_pct": worst_day_success, "runs": attempts,
+                      "status": perf_status(success, worst_day_success, targets["tool_success_pct"], higher_is_better=True)},
+        },
+        "tools": tools,
         "series": series, "granularity": view.granularity(),
+        "engineering": {
+            "answer_s": answer_stats, "server_check_ms": _stats(checks), "client_round_trip_ms": rtt_stats,
+            "tools": sorted(({"tool": tool, **_stats(values)} for tool, values in by_tool.items()), key=lambda item: -(item["samples"] or 0)),
+        },
         "failures": sorted(failures, key=lambda item: str(item["at"]), reverse=True)[:50],
-        "samples": {"tool_calls": len(pairs), "turns": len(turns),
-                    "checks": sum(1 for row in view.hooks if row.get("check_ms") is not None)},
     }
 
 
@@ -909,18 +1003,19 @@ ACTION_EVENTS = {"PreToolUse", "UserPromptSubmit"}
 
 
 def block_numbers(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    """Blocks, block rate (blocks per 100 actions; actions = PreToolUse + UserPromptSubmit),
-    users affected, and repeat blocks (user and rule pairs blocked 2 or more times)."""
+    """Violations (rule hits, blocked or flagged), violation rate (per 100 actions; actions =
+    PreToolUse + UserPromptSubmit), users affected, and repeat violations (user and rule pairs
+    hit 2 or more times)."""
     actions = [row for row in rows if _is_hook(row) and row.get("hook_event") in ACTION_EVENTS]
-    blocked = [row for row in rows if row.get("decision") == "blocked"]
+    found = violation_rows(rows)
     pairs: dict[tuple[str, str], int] = defaultdict(int)
-    for row in blocked:
+    for row in found:
         pairs[(str(row.get("user_name")), str(row.get("rule_id")))] += 1
     return {
-        "blocks": len(blocked),
-        "block_rate": round(len(blocked) / len(actions) * 100, 2) if actions else None,
-        "users_affected": len({row.get("user_name") for row in violation_rows(rows) if not is_ci(row)}),
-        "repeat_blocks": sum(1 for count in pairs.values() if count >= 2),
+        "violations": len(found),
+        "violation_rate": round(len(found) / len(actions) * 100, 2) if actions else None,
+        "users_affected": len({row.get("user_name") for row in found if not is_ci(row)}),
+        "repeat_violations": sum(1 for count in pairs.values() if count >= 2),
     }
 
 
@@ -935,13 +1030,12 @@ def violations(rows: list[dict[str, Any]], scope: Scope, redact_fn: Callable[[An
         for key, value in current.items()
     }
     found = sorted(violation_rows(view.win), key=lambda row: str(row.get("occurred_at") or ""), reverse=True)
-    blocked = [row for row in found if row.get("decision") == "blocked"]
     by_rule: dict[str, dict[str, Any]] = {}
     by_user: dict[str, int] = defaultdict(int)
     by_team: dict[str, int] = defaultdict(int)
-    for row in blocked:
-        entry = by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"], "rule_name": row.get("rule_name"), "severity": row.get("severity"), "blocked": 0})
-        entry["blocked"] += 1
+    for row in found:
+        entry = by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"], "rule_name": row.get("rule_name"), "severity": row.get("severity"), "violations": 0})
+        entry["violations"] += 1
         by_user[CI_LABEL if is_ci(row) else str(row.get("user_name") or "unknown")] += 1
         by_team[row["team"]] += 1
     actions_by_user: dict[str, int] = defaultdict(int)
@@ -949,27 +1043,27 @@ def violations(rows: list[dict[str, Any]], scope: Scope, redact_fn: Callable[[An
         if row.get("hook_event") in ACTION_EVENTS:
             actions_by_user[str(row.get("user_name"))] += 1
     ranked = [
-        {"user": user, "blocks": by_user.get(user, 0), "actions": count, "block_rate": round(by_user.get(user, 0) / count * 100, 2)}
+        {"user": user, "violations": by_user.get(user, 0), "actions": count, "violation_rate": round(by_user.get(user, 0) / count * 100, 2)}
         for user, count in actions_by_user.items() if count >= MIN_ACTIONS
     ]
     unranked = sum(1 for count in actions_by_user.values() if 0 < count < MIN_ACTIONS)
-    rate = top_n(ranked, "block_rate", "user")
+    rate = top_n(ranked, "violation_rate", "user")
     if rate["truncated"]:
         other = rate["items"][-1]
-        other["block_rate"] = round(other["blocks"] / other["actions"] * 100, 2) if other.get("actions") else 0.0
+        other["violation_rate"] = round(other["violations"] / other["actions"] * 100, 2) if other.get("actions") else 0.0
     rate.update({"unranked": unranked, "min_actions": MIN_ACTIONS})
     over_time = {bucket.isoformat(): 0 for bucket in view.buckets()}
-    for row in blocked:
+    for row in found:
         bucket = view.bucket_of(row.get("occurred_at"))
         if bucket in over_time:
             over_time[bucket] += 1
     return {
         **_common(view, {**kpis, **block_kpis}, days),
-        "by_rule": top_n(list(by_rule.values()), "blocked", "rule_id"),
-        "by_user": top_n([{"user": user, "blocked": count} for user, count in by_user.items()], "blocked", "user"),
-        "blocks_by_team": top_n([{"team": team, "blocked": count} for team, count in by_team.items()], "blocked", "team"),
-        "block_rate_by_user": rate,
-        "over_time": [{"day": day, "blocked": count} for day, count in over_time.items()], "granularity": view.granularity(),
+        "by_rule": top_n(list(by_rule.values()), "violations", "rule_id"),
+        "by_user": top_n([{"user": user, "violations": count} for user, count in by_user.items()], "violations", "user"),
+        "violations_by_team": top_n([{"team": team, "violations": count} for team, count in by_team.items()], "violations", "team"),
+        "rate_by_user": rate,
+        "over_time": [{"day": day, "violations": count} for day, count in over_time.items()], "granularity": view.granularity(),
         "rows": [
             {
                 "event_id": row.get("event_id"), "occurred_at": row.get("occurred_at"),
@@ -1010,7 +1104,7 @@ def session_summary(rows: list[dict[str, Any]], session_id: str, tz_offset: int 
         "turns": None if _sum(deltas, "turns") is None else int(_sum(deltas, "turns")),
         "bobcoins": coins, "usd": to_usd(coins, rate),
         "tokens": None if _sum(deltas, "tokens") is None else int(_sum(deltas, "tokens")),
-        "blocks": sum(row.get("decision") == "blocked" for row in items),
+        "violations": len(violation_rows(items)),
         "events": len(items), "per_turn": turns, "usd_rate": rate,
     }
 

@@ -26,5 +26,9 @@ mkdir -p "${DATA_DIR}"
 
 echo "Lab dashboard: http://localhost:${PORT}/  (user ${DASHBOARD_USER}, password ${DASHBOARD_PASSWORD})"
 echo "Hook ingest:   POST http://localhost:${PORT}/api/v1/hooks  (Bearer ${INGEST_TOKEN})"
-echo "Seed data:     .venv/bin/python scripts/seed-lab.py"
+echo "Seed data:     .venv/bin/python scripts/seed-lab.py   (or LAB_SEED=lab|scale ./run-local.sh)"
+# LAB_SEED=lab seeds the small four-user lab; LAB_SEED=scale seeds 60 users and 400 tickets.
+if [ -n "${LAB_SEED:-}" ]; then
+  (sleep 3; BASE_URL="http://127.0.0.1:${PORT}" INGEST_TOKEN="${INGEST_TOKEN}" .venv/bin/python "scripts/seed-${LAB_SEED}.py" >/dev/null 2>&1) &
+fi
 exec .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port "${PORT}"

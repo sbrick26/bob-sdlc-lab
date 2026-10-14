@@ -60,7 +60,7 @@ export interface Kpi { value: number | null; prior: number | null; delta_pct: nu
 export interface TeamRow {
   team: string; users: number; bobcoins: number | null; usd: number | null; budget: number | null;
   budget_used_pct: number | null; budget_bobcoins: number | null; budget_level: string | null; prs_merged: number;
-  median_minutes_to_merge: number | null; blocked: number; first_try_pass_rate_pct: number | null;
+  median_minutes_to_merge: number | null; violations: number; first_try_pass_rate_pct: number | null;
 }
 
 export interface Common {
@@ -79,9 +79,9 @@ export interface OverviewSummary extends Common {
   granularity: Granularity;
   spend_by_team: Array<{ day: string; team: string; bobcoins: number }>;
   daily_active: Array<{ day: string; people: number }>;
-  violations_by_team: TopN<{ team: string; blocked: number }>;
+  violations_by_team: TopN<{ team: string; violations: number }>;
   merge_median_per_day: Array<{ day: string; minutes: number | null; merged: number }>;
-  violations_by_rule: TopN<{ rule_id: string; rule_name: string | null; severity?: string | null; blocked: number; observed: number }>;
+  violations_by_rule: TopN<{ rule_id: string; rule_name: string | null; severity?: string | null; blocked: number; observed: number; violations: number }>;
 }
 
 export interface BudgetEntry { kind: 'team' | 'person'; name: string; team: string | null; bobcoins: number; budget: number | null; pct: number | null; left: number | null; level: string | null; usd: number | null }
@@ -118,13 +118,20 @@ export interface DeliverySummary extends Common {
   };
 }
 
+export interface Stats { p50: number | null; p95: number | null; p99: number | null; samples: number }
 export interface PerformanceSummary extends Common {
-  tools: Array<{ tool: string; calls: number; p50_s: number | null; p95_s: number | null; failures: number }>;
-  series: Array<{ day: string; turn_p95_s: number | null; tool_failure_rate_pct: number | null }>;
+  targets: { answer_s: number; governance_ms: number; tool_success_pct: number };
+  cards: {
+    answer: { typical_s: number | null; slow_s: number | null; status: Light };
+    governance: { typical_ms: number | null; slow_ms: number | null; status: Light };
+    tools: { success_pct: number | null; worst_day_pct: number | null; runs: number; status: Light };
+  };
+  tools: TopN<{ tool: string; runs: number; failures: number; success_pct: number | null; typical_s: number | null }>;
+  series: Array<{ day: string; answer_typical_s: number | null; answer_slow_s: number | null; answers: number; tool_success_pct: number | null; tool_runs: number; governance_typical_ms: number | null; governance_slow_ms: number | null }>;
   granularity: Granularity;
-  failures: Array<{ tool: string; at: string; user: string; ticket: string | null }>;
-  samples: { tool_calls: number; turns: number; checks: number };
+  engineering: { answer_s: Stats; server_check_ms: Stats; client_round_trip_ms: Stats; tools: Array<Stats & { tool: string }> };
 }
+export type Light = 'green' | 'amber' | 'red' | null;
 
 export interface ViolationRow {
   event_id: string; occurred_at: string; user: string; team: string; ticket: string | null;
@@ -133,11 +140,11 @@ export interface ViolationRow {
 
 export interface ViolationsSummary extends Common {
   granularity: Granularity;
-  by_rule: TopN<{ rule_id: string; rule_name: string | null; severity?: string | null; blocked: number }>;
-  by_user: TopN<{ user: string; blocked: number }>;
-  blocks_by_team: TopN<{ team: string; blocked: number }>;
-  block_rate_by_user: TopN<{ user: string; blocks: number; actions: number; block_rate: number }>;
-  over_time: Array<{ day: string; blocked: number }>;
+  by_rule: TopN<{ rule_id: string; rule_name: string | null; severity?: string | null; violations: number }>;
+  by_user: TopN<{ user: string; violations: number }>;
+  violations_by_team: TopN<{ team: string; violations: number }>;
+  rate_by_user: TopN<{ user: string; violations: number; actions: number; violation_rate: number }>;
+  over_time: Array<{ day: string; violations: number }>;
   rows: ViolationRow[];
 }
 

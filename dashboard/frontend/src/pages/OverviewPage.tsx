@@ -11,7 +11,7 @@ import { PageHeader } from '../components/PageHeader';
 import { PageError, PageLoading } from '../components/States';
 import { KpiTile } from '../components/StatCard';
 import { TeamTable } from '../components/TeamTable';
-import { bobcoins, bucketLabel, count, minutes, percent } from '../format';
+import { bobcoins, bucketLabel, count, drillHref, minutes, percent } from '../format';
 import { useSummary, useUsdRate } from '../hooks';
 import { baseOptions, countTicks, severityColor, simpleTip, slot, teamColors, tip, useDarkMode, type TipSpec } from '../theme';
 
@@ -53,13 +53,14 @@ export function OverviewPage() {
     };
   };
   const teamBars = data.violations_by_team.items.map((item) => ({
-    label: item.team, value: item.blocked, display: count(item.blocked), color: item.other ? '#8d8d8d' : colors[item.team] ?? slot(0, dark),
-    tip: { title: item.team, rows: [{ label: 'Blocked actions', value: count(item.blocked), color: colors[item.team] }] },
+    label: item.team, other: item.other, value: item.violations, display: count(item.violations), color: item.other ? '#8d8d8d' : colors[item.team] ?? slot(0, dark),
+    href: item.other ? undefined : drillHref('violations', { team: item.team }),
+    tip: { title: item.team, rows: [{ label: 'Violations', value: count(item.violations), color: colors[item.team] }] },
   }));
   const ruleBars = data.violations_by_rule.items.map((item) => ({
-    label: item.other ? item.rule_id : item.rule_name || item.rule_id, value: item.blocked, display: count(item.blocked),
-    color: item.other ? '#8d8d8d' : severityColor(item.severity, dark),
-    tip: { title: item.rule_name || item.rule_id, rows: [{ label: 'Blocked actions', value: count(item.blocked) }, ...(item.severity ? [{ label: 'Severity', value: item.severity }] : [])] },
+    label: item.other ? item.rule_id : item.rule_name || item.rule_id, other: item.other, value: item.violations, display: count(item.violations),
+    color: item.other ? '#8d8d8d' : severityColor(item.severity, dark), href: item.other ? undefined : drillHref('violations', { rule: item.rule_id }),
+    tip: { title: item.rule_name || item.rule_id, rows: [{ label: 'Blocked', value: count(item.blocked) }, { label: 'Flagged', value: count(item.observed) }, ...(item.severity ? [{ label: 'Severity', value: item.severity }] : [])] },
   }));
 
   return (
@@ -69,10 +70,10 @@ export function OverviewPage() {
         <KpiTile label="Bobcoin spend" kpi={k.bobcoins} format={bobcoins} days={days} detail={k.bobcoins?.value == null ? undefined : usdText(k.bobcoins.value, rate)} />
         <BudgetTile spent={k.budget_used_bobcoins?.value ?? null} budget={k.budget_total?.value ?? null} pct={k.budget_used_pct?.value ?? null} />
         <KpiTile label="Bobcoins per merged PR" kpi={k.bobcoins_per_merged_pr} format={bobcoins} better="down" days={days} detail={k.bobcoins_per_merged_pr?.value == null ? undefined : usdText(k.bobcoins_per_merged_pr.value, rate)} />
-        <KpiTile label="PRs merged" kpi={k.prs_merged} format={count} better="up" days={days} />
+        <KpiTile label="PRs merged" kpi={k.prs_merged} format={count} better="up" days={days} href="#/delivery" />
         <KpiTile label="Daily active users (avg)" kpi={k.daily_active_people} format={(value) => (value == null ? '—' : value.toFixed(1))} better="up" days={days} />
         <KpiTile label="Median time to merge" kpi={k.median_minutes_to_merge} format={minutes} better="down" days={days} />
-        <KpiTile label="Violations blocked" kpi={k.blocked} format={count} better="down" days={days} />
+        <KpiTile label="Violations" kpi={k.violations} format={count} better="down" days={days} href="#/violations" />
         <KpiTile label="First-try CI pass rate" kpi={k.first_try_pass_rate_pct} format={percent} better="up" days={days} />
       </section>
       <RateNote rate={rate} basis={data.usd_rate_basis} fromBrowser={fromBrowser} />
@@ -83,7 +84,7 @@ export function OverviewPage() {
         <ChartPanel title="Bobcoin spend by team" empty={!charts.spend.length} emptyDetail="Spend appears after Bob sends a Stop event with a session cost.">
           <StackedBarChart data={charts.spend} options={{ ...baseOptions(dark), axes: { left: { mapsTo: 'value', stacked: true, title: `Bobcoins (BC) ${per}` }, bottom: { mapsTo: 'key', scaleType: 'labels', domain: charts.order } }, color: { scale: colors }, ...tip(colors, (items) => spendTip(items[0]?.day)) } as never} />
         </ChartPanel>
-        <ChartPanel title="Violations by team" empty={!teamBars.length} emptyDetail="No action was blocked in this period." viewAll={data.violations_by_team.truncated ? { href: '#/violations' } : null}>
+        <ChartPanel title="Violations by team" empty={!teamBars.length} emptyDetail="No violations in this period." viewAll={data.violations_by_team.truncated ? { href: '#/violations' } : null}>
           <HBarList label="Violations by team" items={teamBars} />
         </ChartPanel>
         <ChartPanel title={data.granularity === 'day' ? 'Daily active users' : `Daily active users (average ${per})`} empty={!charts.active.some((item) => item.value > 0)}>
@@ -94,7 +95,7 @@ export function OverviewPage() {
         </ChartPanel>
       </section>
       <section className="chart-grid chart-grid--single">
-        <ChartPanel title="Violations by rule" empty={!ruleBars.length} emptyDetail="No action was blocked in this period." viewAll={data.violations_by_rule.truncated ? { href: '#/violations' } : null}>
+        <ChartPanel title="Violations by rule" empty={!ruleBars.length} emptyDetail="No violations in this period." viewAll={data.violations_by_rule.truncated ? { href: '#/violations' } : null}>
           <HBarList label="Violations by rule" items={ruleBars} />
         </ChartPanel>
       </section>

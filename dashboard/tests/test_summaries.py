@@ -129,9 +129,11 @@ def test_percentiles_with_paired_tool_events():
     rows.append(row("2026-03-02T10:30:00Z", "PreToolUse", tool_name="execute_command", tool_use_id="lost"))
     rows.append(row("2026-03-02T10:31:00Z", "PreToolUse", tool_name="execute_command", tool_use_id="blocked", decision="blocked"))
     perf = summaries.performance(rows, Scope())
-    read = next(item for item in perf["tools"] if item["tool"] == "read_file")
-    assert (read["p50_s"], read["p95_s"]) == (6.0, 9.6)
+    read = next(item for item in perf["tools"]["items"] if item["tool"] == "read_file")
+    assert (read["p50_s"], read["p95_s"], read["typical_s"], read["success_pct"]) == (6.0, 9.6, 6.0, 100.0)
     assert perf["kpis"]["tool_failure_rate_pct"]["value"] == round(1 / 6 * 100, 1)
+    assert perf["cards"]["tools"]["success_pct"] == round(5 / 6 * 100, 1)
+    assert perf["engineering"]["tools"][0]["samples"] == 5
     turns = [row("2026-03-02T09:00:00Z"), row("2026-03-02T09:01:00Z"), row("2026-03-02T09:05:00Z", "Stop"),
              row("2026-03-02T09:10:00Z"), row("2026-03-02T09:12:00Z", "Stop")]
     assert summaries.performance(turns, Scope())["kpis"]["turn_p50_s"]["value"] == 210.0
@@ -147,7 +149,7 @@ def test_governance_check_time_is_stored_and_shown():
 
 # ---------------------------------------------------------------- violations
 
-def test_block_rate_and_repeat_blocks():
+def test_violation_rate_and_repeat_violations():
     rows = [
         row("2026-03-02T10:00:00Z"), row("2026-03-02T10:01:00Z", "PreToolUse"),
         row("2026-03-02T10:02:00Z", "PreToolUse", decision="blocked", rule_id="GOV-GIT-001", rule_name="Unsafe git command"),
@@ -156,12 +158,12 @@ def test_block_rate_and_repeat_blocks():
         row("2026-03-02T10:05:00Z", "Stop"),
     ]
     numbers = summaries.block_numbers(rows)
-    assert numbers == {"blocks": 3, "block_rate": 60.0, "users_affected": 2, "repeat_blocks": 1}
-    ranked = summaries.violations(rows, Scope())["block_rate_by_user"]
+    assert numbers == {"violations": 3, "violation_rate": 60.0, "users_affected": 2, "repeat_violations": 1}
+    ranked = summaries.violations(rows, Scope())["rate_by_user"]
     assert ranked["items"] == [] and ranked["unranked"] == 2    # fewer than 20 actions each
     busy = rows + [row(f"2026-03-02T11:{minute:02d}:00Z", "PreToolUse") for minute in range(20)]
-    ranked = summaries.violations(busy, Scope())["block_rate_by_user"]
-    assert [(item["user"], item["block_rate"]) for item in ranked["items"]] == [("sam", round(2 / 24 * 100, 2))]
+    ranked = summaries.violations(busy, Scope())["rate_by_user"]
+    assert [(item["user"], item["violation_rate"]) for item in ranked["items"]] == [("sam", round(2 / 24 * 100, 2))]
     assert ranked["unranked"] == 1
 
 
@@ -245,7 +247,7 @@ def test_drawer_sentence_and_empty_fields():
     write = {"user_name": "jo", "decision": "blocked", "hook_event": "PreToolUse", "tool_name": "write_file",
              "tool_input_content": json.dumps({"path": "app.py", "content": "x"})}
     assert detail.sentence(write) == "Jo tried to write to app.py."
-    assert detail.title({"hook_event": "Stop"}) == "Session ended"
+    assert detail.title({"hook_event": "Stop"}) == "Turn ended"
     view = detail.build({**prompt, "workspace": "no-folder"}, None)
     assert "why" not in view and "remediation" not in view
     assert all(item["value"] not in (None, "", "no-folder") for item in view["context"] + view["technical"])
@@ -392,3 +394,41 @@ def test_ci_review_details_and_links():
     assert details["pr_url"].endswith("/pull/4") and details["run_url"].endswith("/runs/1")
     body["data"]["pr_url"] = "javascript:alert(1)"
     assert client.post("/api/v1/lab/events", headers={"Authorization": f"Bearer {TOKEN}"}, json=body).status_code == 422
+
+
+def test_performance_status_lights():
+    assert summaries.perf_status(42, 100, 120) == "green"
+    assert summaries.perf_status(42, 190, 120) == "amber"     # only the slowest 1 in 20 misses
+    assert summaries.perf_status(130, 190, 120) == "red"
+    assert summaries.perf_status(None, None, 120) is None
+    assert summaries.perf_status(98, 96, 95, higher_is_better=True) == "green"
+    assert summaries.perf_status(98, 90, 95, higher_is_better=True) == "amber"
+    assert summaries.perf_status(90, 90, 95, higher_is_better=True) == "red"
+
+
+def test_round_trip_header_is_stored_and_used(monkeypatch):
+    monkeypatch.setenv("PERF_TARGETS", json.dumps({"governance_ms": 300}))
+    for value in ("150", "250", "900"):
+        hook("UserPromptSubmit", "rtt-amy", "RTT-1", headers={"X-Hook-Prev-Ms": value, "X-Governance-Team": "RTT"}, prompt="hi")
+    hook("UserPromptSubmit", "rtt-amy", "RTT-1", headers={"X-Hook-Prev-Ms": "junk", "X-Governance-Team": "RTT"}, prompt="hi")
+    stored = sorted(event.get("hook_rtt_prev_ms") or 0 for event in db._events.values() if event.get("user_name") == "rtt-amy")
+    assert stored == [0, 150, 250, 900]
+    perf = client.get("/api/v1/performance/summary?team=RTT", auth=AUTH).json()
+    card = perf["cards"]["governance"]
+    assert card["typical_ms"] == 250.0 and card["status"] == "amber"
+    assert perf["targets"]["governance_ms"] == 300 and perf["targets"]["answer_s"] == 120
+
+
+def test_tool_and_outcome_filters():
+    rows_before = len(db._events)
+    hook("PreToolUse", "out-ned", "OUT-1", tool_name="read_file", tool_use_id="o1", tool_input={"path": "a.py"})
+    hook("PostToolUse", "out-ned", "OUT-1", tool_name="read_file", tool_use_id="o1", tool_response="ok")
+    hook("PreToolUse", "out-ned", "OUT-1", tool_name="execute_command", tool_use_id="o2", tool_input={"command": "pip install nope-pkg"})
+    assert len(db._events) == rows_before + 3
+    tools = client.get("/api/v1/events?user=out-ned&tool=read_file", auth=AUTH).json()["events"]
+    assert {item["tool_name"] for item in tools} == {"read_file"} and len(tools) == 2
+    assert client.get("/api/v1/events?user=out-ned&outcome=completed", auth=AUTH).json()["count"] == 1
+    assert client.get("/api/v1/events?user=out-ned&outcome=blocked", auth=AUTH).json()["count"] == 1
+    assert client.get("/api/v1/events?outcome=bogus", auth=AUTH).status_code == 422
+    old = [row("2026-03-02T10:00:00Z", "PreToolUse", tool_name="x", tool_use_id="lost")]
+    assert set(summaries.tool_outcomes(old).values()) == {"failed"}

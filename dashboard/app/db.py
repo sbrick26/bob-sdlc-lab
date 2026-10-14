@@ -29,7 +29,7 @@ FIELDS = (
     "lab_ticket", "lab_role", "lab_branch", "lab_cost", "lab_path", "lab_kind", "lab_pr", "lab_data",
     "lab_tokens", "lab_turns",
     # Team (X-Governance-Team) and this server's processing time per hook call.
-    "team", "check_ms", "session_source",
+    "team", "check_ms", "session_source", "hook_rtt_prev_ms",
 )
 
 SORT_COLUMNS = {

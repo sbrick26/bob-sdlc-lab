@@ -14,8 +14,9 @@ export function StatCard({ label, value, detail, delta }: { label: string; value
 }
 
 /** A KPI tile with its delta vs the prior period. `better` says which direction is good, or null. */
-export function KpiTile({ label, kpi, format, better = null, days, detail }: {
-  label: string; kpi: Kpi | undefined; format: (value: number | null) => string; better?: Better; days: number | null; detail?: ReactNode;
+export function KpiTile({ label, kpi, format, better = null, days, detail, href }: {
+  label: string; kpi: Kpi | undefined; format: (value: number | null) => string; better?: Better; days: number | null; detail?: ReactNode; href?: string;
 }) {
-  return <StatCard label={label} value={format(kpi?.value ?? null)} detail={detail} delta={deltaText(kpi?.delta_pct, days, better)} />;
+  const card = <StatCard label={label} value={format(kpi?.value ?? null)} detail={detail} delta={deltaText(kpi?.delta_pct, days, better)} />;
+  return href ? <a className="stat-card--link" href={href} aria-label={`${label}: open details`}>{card}</a> : card;
 }

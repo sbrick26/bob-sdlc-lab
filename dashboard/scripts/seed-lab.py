@@ -39,6 +39,14 @@ NOW = datetime.now(timezone.utc).replace(second=0, microsecond=0)
 # Demo usage per Bob turn: Bobcoins and context tokens, scaled per ticket.
 COIN_PER_TURN = 0.15
 TOKENS_PER_TURN = 4_000
+REPO_URL = "https://github.com/sbrick26/bob-sdlc-lab"
+ANSWERS = [
+    "I read the ticket and wrote the plan to `plans/{ticket}.md`:\n\n1. Add the endpoint in `{code}`\n2. Cover the happy path and the empty case in `{test}`\n3. Run `pytest -q` before opening the PR",
+    "The change is in place. I added **input validation** and two tests.\n\n- `{code}`: new handler and helper\n- `{test}`: happy path and the empty list\n\nAll tests pass locally.",
+    "That install was blocked by policy, so I used the standard library instead. No new dependency is needed.",
+    "Pull request opened from `feature/{branch}`. The PR checklist is filled in and CI is running.",
+    "I fixed the review findings: the missing test is added and the error message now names the field.",
+]
 TEAMS = {"sam": "Platform", "priya": "Platform", "jordan": "Field Apps", "alex": "Field Apps"}
 # Seconds a tool takes before its PostToolUse, scaled per ticket.
 TOOL_SECONDS = {"read_file": 2, "write_file": 4, "apply_diff": 6, "execute_command": 25}
@@ -171,6 +179,8 @@ class Run:
             headers["X-Lab-Cost"] = f"{usage['cost']:.4f}"
             headers["X-Lab-Tokens"] = str(int(usage["tokens"]))
             headers["X-Lab-Turns"] = str(int(usage["turns"]))
+        # Laptop-side round trip of the previous governance call, in ms.
+        headers["X-Hook-Prev-Ms"] = str(90 + (self.count * 37) % 260 + (400 if self.count % 23 == 0 else 0))
         body = {"hook_event_name": event, "session_id": self.session(name),
                 "cwd": "/workspace/bob-sdlc-lab", **payload}
         post("/api/v1/hooks", body, headers)
@@ -189,7 +199,11 @@ class Run:
         state["turns"] += turns
         state["cost"] += coin * turns * scale
         state["tokens"] += tokens * turns * scale * (1 + state["turns"] / 10)
-        self.hook(minute, "Stop", role=role, user=user, usage=dict(state), last_assistant_message="Turn complete.")
+        answer = ANSWERS[int(state["turns"]) % len(ANSWERS)].format(
+            ticket=self.person["ticket"], code=self.person["files"][0], test=self.person["files"][1], branch=self.person["ticket"].lower())
+        if role == "ci-reviewer":
+            answer = f"Reviewed PR #{self.person['pr']} against the checklist. Findings are in the CI comment."
+        self.hook(minute, "Stop", role=role, user=user, usage=dict(state), last_assistant_message=answer)
 
     def explore(self, minute: float) -> None:
         """A long exploratory session with a large context: the outlier that pushes its user near the budget."""
@@ -215,19 +229,19 @@ class Run:
         if not extra.get("blocked_rule") and not fail:
             seconds = TOOL_SECONDS.get(tool, 5) * self.person["scale"] * (1 + (self.count % 5) / 4)
             self.hook(minute + seconds / 60, "PostToolUse", tool_name=tool, tool_use_id=tool_use,
-                      tool_input=tool_input, tool_response="ok")
+                      tool_input=tool_input, tool_response=tool_output(tool, tool_input))
 
     def play(self) -> None:
         p = self.person
         ticket, code_file, test_file = p["ticket"], p["files"][0], p["files"][1]
         self.lab(0, "ticket_started")
-        self.hook(0.5, "SessionStart")
+        self.hook(0.5, "SessionStart", source="startup")
         self.hook(1, "UserPromptSubmit", prompt=f"Read tickets/{ticket}.md and write a plan to plans/{ticket}.md")
         self.tool(2, "read_file", {"path": f"tickets/{ticket}.md"})
         self.tool(6, "write_file", {"path": f"plans/{ticket}.md", "content": f"# Plan for {ticket}\n"})
         self.turn_end(8, turns=2)
         self.hook(14, "UserPromptSubmit", prompt="The plan looks right. Implement it with tests.")
-        self.tool(18, "write_file", {"path": code_file, "content": "# implementation\n"})
+        self.tool(18, "write_file", {"path": code_file, "content": code_snippet(ticket)})
         block = p["block"]
         if "prompt" in block:
             self.hook(27, "UserPromptSubmit", prompt=block["prompt"], blocked_rule=block["rule"])
@@ -235,8 +249,8 @@ class Run:
             self.tool(27, block["tool"], block["input"], blocked_rule=block["rule"])
         self.turn_end(28, turns=3)
         self.hook(30, "UserPromptSubmit", prompt="That was blocked by policy. Use an approved approach instead.")
-        self.tool(36, "apply_diff", {"path": code_file, "diff": "+# approved approach\n"})
-        self.tool(44, "write_file", {"path": test_file, "content": "def test_ticket():\n    assert True\n"})
+        self.tool(36, "apply_diff", {"path": code_file, "diff": "@@ -12,6 +12,9 @@ def handle(request):\n-    data = request.json\n+    data = request.get_json(silent=True) or {}\n+    if not data.get(\"items\"):\n+        return {\"error\": \"items is required\"}, 400\n     return process(data)\n"})
+        self.tool(44, "write_file", {"path": test_file, "content": test_snippet(ticket)})
         self.tool(52, "execute_command", {"command": "python -m pytest -q"})
         if p.get("failed_tool"):
             # The end-to-end run never returns: a PreToolUse with no PostToolUse.
@@ -246,16 +260,21 @@ class Run:
         self.tool(66, "execute_command", {"command": f"git push origin feature/{ticket.lower()}"})
         self.turn_end(70, turns=2)
         pr_minute = 72 + p.get("pr_delay", 0)
-        self.lab(pr_minute, "pr_opened")
+        self.lab(pr_minute, "pr_opened", data={"title": f"{ticket}: {p.get('title', 'ticket change')}", "pr_url": f"{REPO_URL}/pull/{p['pr']}"})
         minute = pr_minute + 2
         for index, result in enumerate(p["ci"]):
             self.hook(minute, "UserPromptSubmit", role="ci-reviewer", user="ci-reviewer",
                       prompt=f"Review PR #{p['pr']} against the checklist")
             self.turn_end(minute + 0.5, role="ci-reviewer", user="ci-reviewer", turns=2)
-            self.lab(minute + 1, "ci_result", user="ci-reviewer", data=result)
+            findings = FINDINGS[: result.get("findings") or 0]
+            self.lab(minute + 1, "ci_result", user="ci-reviewer", data={
+                **result, "criteria_met": 7 - (result.get("blocking") or 0) - (1 if result.get("findings") else 0), "criteria_total": 7,
+                "findings_list": findings, "pr_url": f"{REPO_URL}/pull/{p['pr']}",
+                "run_url": f"{REPO_URL}/actions/runs/{9_100_000 + p['pr'] * 10 + index}",
+            })
             if result["verdict"] == "FAIL" and p["merge_after"] is not None:
                 self.hook(minute + 6, "UserPromptSubmit", prompt="Fix the blocking review findings.")
-                self.tool(minute + 10, "apply_diff", {"path": code_file, "diff": "+# review fix\n"})
+                self.tool(minute + 10, "apply_diff", {"path": code_file, "diff": "@@ -30,3 +30,4 @@\n-    raise ValueError(\"bad input\")\n+    raise ValueError(f\"field {name!r} is required\")\n"})
                 self.tool(minute + 16, "execute_command", {"command": "python -m pytest -q"})
                 self.turn_end(minute + 18, turns=3)
             minute += 24 if index == 0 and len(p["ci"]) > 1 else 0
@@ -264,9 +283,10 @@ class Run:
         merge = p["merge_after"]
         if merge is None:
             return
-        self.lab(merge - 6, "approved", user="guide")
-        self.lab(merge, "merged", user="guide",
-                 data={"approver": "guide", "review_rounds": p["rounds"], "lines_changed": p["lines"]})
+        self.lab(merge - 6, "approved", user="maintainer")
+        self.lab(merge, "merged", user="maintainer",
+                 data={"approver": "maintainer", "review_rounds": p["rounds"], "lines_changed": p["lines"],
+                       "title": f"{ticket}: {p.get('title', 'ticket change')}", "pr_url": f"{REPO_URL}/pull/{p['pr']}"})
         self.lab(merge + 1, "ticket_done")
 
 
@@ -277,10 +297,55 @@ PRIOR_WEEK: list[dict[str, Any]] = [
      "failed_tool": False, "explore": None}
     for index, person in enumerate(PEOPLE[:4])
 ]
-for person, delay in zip(PEOPLE, (0, 18, 6, 25, 3, 12, 30, 9)):
-    person["pr_delay"] = delay
+TITLES = ("Validate route input", "Mask phone numbers in the daily report", "Fix scheduler overlap",
+          "Inventory low-stock alert", "Crew assignment rules", "Billing export", "Dispatch phone routing", "Asset tags")
+for person, delay, title in zip(PEOPLE, (0, 18, 6, 25, 3, 12, 30, 9), TITLES):
+    person["pr_delay"], person["title"] = delay, title
+for person, title in zip(PRIOR_WEEK, ("Route docs", "Report header", "Scheduler tests", "Inventory CSV")):
+    person["title"] = title
 PEOPLE[5]["explore"] = 30       # priya, KAN-206: one long session, over 80% of her 50 Bobcoin budget
 PEOPLE[6]["failed_tool"] = True  # jordan, KAN-207: one tool call that never returns
+
+
+FINDINGS = [
+    "Missing test for the empty list case",
+    "Error message does not name the missing field",
+    "New helper has no docstring",
+    "Duplicated date parsing; reuse fieldops.time.parse",
+]
+
+
+def code_snippet(ticket: str) -> str:
+    return (
+        f'"""{ticket}: request handler."""\n\n'
+        "from fieldops.store import process\n\n\n"
+        "def handle(request):\n"
+        "    data = request.json\n"
+        "    return process(data)\n"
+    )
+
+
+def test_snippet(ticket: str) -> str:
+    return (
+        f'"""Tests for {ticket}."""\n\n'
+        "def test_handle_returns_items(client):\n"
+        "    response = client.post('/items', json={'items': [1]})\n"
+        "    assert response.status_code == 200\n\n\n"
+        "def test_handle_rejects_empty(client):\n"
+        "    response = client.post('/items', json={})\n"
+        "    assert response.status_code == 400\n"
+    )
+
+
+def tool_output(tool: str, tool_input: dict[str, Any]) -> str:
+    command = str(tool_input.get("command") or "")
+    if "pytest" in command:
+        return "........................                                     [100%]\n24 passed in 1.84s"
+    if command.startswith("git push"):
+        return "To github.com:sbrick26/bob-sdlc-lab.git\n * [new branch]      HEAD -> " + command.split()[-1]
+    if tool == "read_file":
+        return f"# {tool_input.get('path')}\nStatus: To do\nAcceptance: the endpoint rejects an empty list with 400."
+    return "ok"
 
 
 def main() -> int:

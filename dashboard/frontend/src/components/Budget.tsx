@@ -23,7 +23,7 @@ export function BudgetTile({ spent, budget, pct }: { spent: number | null; budge
 export function BudgetCell({ spent, budget, pct }: { spent: number | null; budget: number | null; pct: number | null }) {
   if (!budget) return <>—</>;
   return (
-    <span className={`budget-bar budget-bar--${level(pct)}`}>
+    <span className={`budget-bar budget-bar--cell budget-bar--${level(pct)}`}>
       <span className="budget-bar__value">{fraction(spent, budget)}</span>
       <span className="budget-bar__track"><span className="budget-bar__fill" style={{ width: `${Math.min(pct ?? 0, 100)}%` }} /></span>
       <span className="budget-bar__pct">{percent(pct)}</span>

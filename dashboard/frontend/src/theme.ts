@@ -118,5 +118,6 @@ export function neutral(index: number, dark: boolean): string {
 
 /** Team colors follow the sorted list of all teams, so a team keeps its color on every page; "Other" is grey. */
 export function teamColors(teams: string[], dark: boolean): Record<string, string> {
-  return colorScale([...teams].filter((team) => team !== 'Other').sort(), dark, ['Other']);
+  const named = [...new Set(teams)].filter((team) => team !== 'Other' && team !== 'unassigned').sort();
+  return colorScale(named, dark, ['Other', 'unassigned']);
 }

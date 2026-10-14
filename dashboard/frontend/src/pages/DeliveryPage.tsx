@@ -27,7 +27,7 @@ export function DeliveryPage() {
     const colors = teamColors(data.teams, dark);
     return {
       merge: data.merge_by_team.items.map((item) => ({
-        label: item.team, value: item.minutes, display: minutes(item.minutes), color: item.other ? '#8d8d8d' : colors[item.team] ?? slot(0, dark),
+        label: item.team, other: item.other, value: item.minutes, display: minutes(item.minutes), color: item.other ? '#8d8d8d' : colors[item.team] ?? slot(0, dark),
         tip: { title: item.team, rows: [{ label: 'Median time to merge', value: minutes(item.minutes) }, { label: 'Merged PRs', value: count(item.merged) }] },
       })),
       perPr: data.cost_per_pr_by_team.items.map((item) => ({
@@ -50,19 +50,19 @@ export function DeliveryPage() {
   const days = data.period_days;
   const per = data.granularity === 'day' ? 'per day' : `per ${data.granularity}`;
   const columns: Column<TicketRow>[] = [
-    { key: 'ticket', header: 'Ticket', render: (row) => row.ticket, sort: (row) => row.ticket },
-    { key: 'user', header: 'User', render: (row) => row.user ?? '—', sort: (row) => row.user },
-    { key: 'team', header: 'Team', render: (row) => row.team, sort: (row) => row.team },
-    { key: 'started', header: 'Started', render: (row) => shortTime(row.started_at), sort: (row) => row.started_at },
-    { key: 'pr', header: 'PR opened', render: (row) => shortTime(row.pr_opened_at), sort: (row) => row.pr_opened_at },
-    { key: 'merged', header: 'Merged', render: (row) => (row.merged_at ? shortTime(row.merged_at) : <Tag size="sm" type="gray">{row.status.replace('_', ' ')}</Tag>), sort: (row) => row.merged_at },
-    { key: 'topr', header: 'Min to PR', numeric: true, render: (row) => count(row.minutes_to_pr), sort: (row) => row.minutes_to_pr },
-    { key: 'tomerge', header: 'Min to merge', numeric: true, render: (row) => count(row.minutes_to_merge), sort: (row) => row.minutes_to_merge },
-    { key: 'hands', header: 'Hands-on h', numeric: true, render: (row) => (row.hands_on_hours == null ? '—' : row.hands_on_hours.toFixed(1)), sort: (row) => row.hands_on_hours },
-    { key: 'coins', header: 'Bobcoins', numeric: true, render: (row) => bobcoins(row.bobcoins), sort: (row) => row.bobcoins },
-    { key: 'usd', header: 'USD', numeric: true, render: (row) => usdText(row.bobcoins, rate) },
-    { key: 'verdict', header: 'Review', render: (row) => (row.verdict ? <Tag size="sm" type={row.verdict === 'PASS' ? 'green' : 'red'}>{row.verdict}</Tag> : '—'), sort: (row) => row.verdict },
-    { key: 'findings', header: 'Findings', numeric: true, render: (row) => count(row.findings), sort: (row) => row.findings },
+    { key: 'ticket', header: 'Ticket', width: '6rem', render: (row) => row.ticket, sort: (row) => row.ticket },
+    { key: 'user', header: 'User', width: '6rem', render: (row) => row.user ?? '—', sort: (row) => row.user },
+    { key: 'team', header: 'Team', width: '6.5rem', render: (row) => row.team, sort: (row) => row.team },
+    { key: 'started', header: 'Started', width: '8.5rem', render: (row) => shortTime(row.started_at), sort: (row) => row.started_at },
+    { key: 'pr', header: 'PR opened', width: '8.5rem', render: (row) => shortTime(row.pr_opened_at), sort: (row) => row.pr_opened_at },
+    { key: 'merged', header: 'Merged', width: '8.5rem', render: (row) => (row.merged_at ? shortTime(row.merged_at) : <Tag size="sm" type="gray">{row.status.replace('_', ' ')}</Tag>), sort: (row) => row.merged_at },
+    { key: 'topr', header: 'Time to PR', numeric: true, width: '7rem', render: (row) => minutes(row.minutes_to_pr), sort: (row) => row.minutes_to_pr },
+    { key: 'tomerge', header: 'Time to merge', numeric: true, width: '7rem', render: (row) => minutes(row.minutes_to_merge), sort: (row) => row.minutes_to_merge },
+    { key: 'hands', header: 'Active time', title: 'Time spent working with Bob from the first prompt to the PR, not counting gaps over 15 minutes', numeric: true, width: '7rem', render: (row) => minutes(row.hands_on_hours == null ? null : row.hands_on_hours * 60), sort: (row) => row.hands_on_hours },
+    { key: 'coins', header: 'Bobcoins', numeric: true, width: '6.5rem', render: (row) => bobcoins(row.bobcoins), sort: (row) => row.bobcoins },
+    { key: 'usd', header: 'USD', numeric: true, width: '5rem', render: (row) => usdText(row.bobcoins, rate) },
+    { key: 'verdict', header: 'Review', width: '5rem', render: (row) => (row.verdict ? <Tag size="sm" type={row.verdict === 'PASS' ? 'green' : 'red'}>{row.verdict}</Tag> : '—'), sort: (row) => row.verdict },
+    { key: 'findings', header: 'Findings', numeric: true, width: '5rem', render: (row) => count(row.findings), sort: (row) => row.findings },
   ];
   const unrankedPr = data.cost_per_pr_by_team.unranked;
 
@@ -95,7 +95,7 @@ export function DeliveryPage() {
       <TeamTable rows={data.by_team} rate={rate} />
       <section className="panel table-panel">
         <div className="panel__header"><h2>Tickets</h2></div>
-        {data.tickets.length ? <NumberTable label="Tickets" columns={columns} rows={data.tickets} rowKey={(row) => row.ticket} /> : <EmptyState title="No tickets in this period" detail="Tickets appear when events carry X-Lab-Ticket." />}
+        {data.tickets.length ? <NumberTable label="Tickets" minWidth="80rem" columns={columns} rows={data.tickets} rowKey={(row) => row.ticket} /> : <EmptyState title="No tickets in this period" detail="Tickets appear when events carry a ticket key." />}
       </section>
     </>
   );

@@ -12,7 +12,7 @@ import { KpiTile } from '../components/StatCard';
 import { useEventDrawer } from '../components/useEventDrawer';
 import { useFilters, useNewIds } from '../context';
 import { HBarList } from '../components/HBarList';
-import { bucketLabel, count, shortTime } from '../format';
+import { bucketLabel, count, drillHref, shortTime } from '../format';
 import { useSummary } from '../hooks';
 import { baseOptions, countTicks, neutral, plural, severityColor, simpleTip, slot, teamColors, useDarkMode } from '../theme';
 import type { RuleSummary, ViolationRow, ViolationsSummary } from '../types';
@@ -59,64 +59,67 @@ function ViolationsTab({ data }: { data: ViolationsSummary }) {
   const fresh = useNewIds(data.rows.map((row) => row.event_id), JSON.stringify(filters));
   const colors = teamColors(data.teams, dark);
   const charts = useMemo(() => ({
-    time: data.over_time.map((item) => ({ group: 'Blocked', key: bucketLabel(item.day, data.granularity), value: item.blocked, day: item.day })),
+    time: data.over_time.map((item) => ({ group: 'Violations', key: bucketLabel(item.day, data.granularity), value: item.violations, day: item.day })),
     rule: data.by_rule.items.map((item) => ({
-      label: item.other ? item.rule_id : item.rule_name || item.rule_id, value: item.blocked, display: count(item.blocked),
-      color: item.other ? '#8d8d8d' : severityColor(item.severity, dark),
-      tip: { title: item.rule_name || item.rule_id, rows: [{ label: 'Blocked actions', value: count(item.blocked) }, ...(item.severity ? [{ label: 'Severity', value: item.severity }] : [])] },
+      label: item.other ? item.rule_id : item.rule_name || item.rule_id, other: item.other, value: item.violations, display: count(item.violations),
+      color: item.other ? '#8d8d8d' : severityColor(item.severity, dark), href: item.other ? undefined : drillHref('violations', { rule: item.rule_id }),
+      tip: { title: item.rule_name || item.rule_id, rows: [{ label: 'Violations', value: count(item.violations) }, ...(item.severity ? [{ label: 'Severity', value: item.severity }] : [])] },
     })),
     user: data.by_user.items.map((item, index) => ({
-      label: item.user, value: item.blocked, display: count(item.blocked), color: item.other ? '#8d8d8d' : neutral(index, dark),
-      tip: { title: item.user, rows: [{ label: 'Blocked actions', value: count(item.blocked) }] },
+      label: item.user, other: item.other, value: item.violations, display: count(item.violations), color: item.other ? '#8d8d8d' : neutral(index, dark),
+      href: item.other ? undefined : drillHref('violations', { user: item.user }),
+      tip: { title: item.user, rows: [{ label: 'Violations', value: count(item.violations) }] },
     })),
-    team: data.blocks_by_team.items.map((item) => ({
-      label: item.team, value: item.blocked, display: count(item.blocked), color: item.other ? '#8d8d8d' : colors[item.team] ?? slot(0, dark),
-      tip: { title: item.team, rows: [{ label: 'Blocked actions', value: count(item.blocked), color: colors[item.team] }] },
+    team: data.violations_by_team.items.map((item) => ({
+      label: item.team, other: item.other, value: item.violations, display: count(item.violations), color: item.other ? '#8d8d8d' : colors[item.team] ?? slot(0, dark),
+      href: item.other ? undefined : drillHref('violations', { team: item.team }),
+      tip: { title: item.team, rows: [{ label: 'Violations', value: count(item.violations), color: colors[item.team] }] },
     })),
-    rate: data.block_rate_by_user.items.map((item, index) => ({
-      label: item.user, value: item.block_rate, display: `${item.block_rate.toFixed(1)} per 100`, color: item.other ? '#8d8d8d' : neutral(index, dark),
-      tip: { title: item.user, rows: [{ label: 'Block rate', value: `${item.block_rate.toFixed(1)} per 100 actions` }, { label: 'Blocks', value: count(item.blocks) }, { label: 'Actions', value: count(item.actions) }] },
+    rate: data.rate_by_user.items.map((item, index) => ({
+      label: item.other ? `${item.user}, average` : item.user, other: item.other, value: item.violation_rate, display: `${item.violation_rate.toFixed(1)} per 100`,
+      color: item.other ? '#8d8d8d' : neutral(index, dark), href: item.other ? undefined : drillHref('violations', { user: item.user }),
+      tip: { title: item.user, rows: [{ label: 'Violation rate', value: `${item.violation_rate.toFixed(1)} per 100 actions` }, { label: 'Violations', value: count(item.violations) }, { label: 'Actions', value: count(item.actions) }] },
     })),
   }), [data, dark, colors]);
   const k = data.kpis;
   const days = data.period_days;
-  const per = data.granularity === 'day' ? 'Blocks over time' : `Blocks over time, per ${data.granularity}`;
+  const per = data.granularity === 'day' ? 'Violations over time' : `Violations over time, per ${data.granularity}`;
   const visible = data.rows.slice((page - 1) * pageSize, page * pageSize);
   const byId = new Map<string, ViolationRow>(visible.map((row) => [row.event_id, row]));
   const rows = visible.map((row) => ({
     id: row.event_id, time: shortTime(row.occurred_at), user: row.user, team: row.team, ticket: row.ticket || '—',
     rule: row.rule_name || row.rule_id, control_point: row.control_point, excerpt: row.excerpt || '—', decision: row.decision,
   }));
-  const rate = data.block_rate_by_user;
+  const rate = data.rate_by_user;
   return (
     <>
       <section className="kpi-grid kpi-grid--four" aria-label="Violation totals">
-        <KpiTile label="Blocks" kpi={k.blocks} format={count} better="down" days={days} />
-        <KpiTile label="Block rate (per 100 actions)" kpi={k.block_rate} format={(value) => (value == null ? '—' : value.toFixed(1))} better="down" days={days} />
+        <KpiTile label="Violations" kpi={k.violations} format={count} better="down" days={days} />
+        <KpiTile label="Violation rate (per 100 actions)" kpi={k.violation_rate} format={(value) => (value == null ? '—' : value.toFixed(1))} better="down" days={days} />
         <KpiTile label="Users affected" kpi={k.users_affected} format={count} better="down" days={days} />
-        <KpiTile label="Repeat blocks" kpi={k.repeat_blocks} format={count} better="down" days={days} />
+        <KpiTile label="Repeat violations" kpi={k.repeat_violations} format={count} better="down" days={days} />
       </section>
       <section className="chart-grid chart-grid--single">
-        <ChartPanel title={per} empty={!charts.time.some((item) => item.value > 0)} emptyDetail="No action was blocked in this period.">
-          <SimpleBarChart data={charts.time} options={{ ...baseOptions(dark, '220px'), axes: { bottom: { mapsTo: 'key', scaleType: 'labels' }, left: { mapsTo: 'value', ...countTicks(Math.max(0, ...charts.time.map((item) => item.value))) } }, legend: { enabled: false }, color: { scale: { Blocked: slot(0, dark) } }, ...simpleTip({ Blocked: slot(0, dark) }, 'Blocked', (d) => plural(d.value, 'block', 'blocks')) } as never} />
+        <ChartPanel title={per} empty={!charts.time.some((item) => item.value > 0)} emptyDetail="No violations in this period.">
+          <SimpleBarChart data={charts.time} options={{ ...baseOptions(dark, '220px'), axes: { bottom: { mapsTo: 'key', scaleType: 'labels' }, left: { mapsTo: 'value', ...countTicks(Math.max(0, ...charts.time.map((item) => item.value))) } }, legend: { enabled: false }, color: { scale: { Violations: slot(0, dark) } }, ...simpleTip({ Violations: slot(0, dark) }, 'Violations', (d) => count(d.value)) } as never} />
         </ChartPanel>
       </section>
       <section className="chart-grid chart-grid--three chart-grid--even">
-        <ChartPanel title="Blocks by rule" empty={!charts.rule.length} emptyDetail="No action was blocked in this period." viewAll={data.by_rule.truncated ? { href: '#/violations', label: 'View all rules' } : null}>
-          <HBarList label="Blocks by rule" items={charts.rule} />
+        <ChartPanel title="Violations by rule" empty={!charts.rule.length} emptyDetail="No violations in this period." viewAll={data.by_rule.truncated ? { href: '#/violations', label: 'View all rules' } : null}>
+          <HBarList label="Violations by rule" items={charts.rule} />
         </ChartPanel>
-        <ChartPanel title="Blocks by user" empty={!charts.user.length} emptyDetail="No action was blocked in this period." viewAll={data.by_user.truncated ? { href: '#/usage' } : null}>
-          <HBarList label="Blocks by user" items={charts.user} />
+        <ChartPanel title="Violations by user" empty={!charts.user.length} emptyDetail="No violations in this period." viewAll={data.by_user.truncated ? { href: '#/usage' } : null}>
+          <HBarList label="Violations by user" items={charts.user} />
         </ChartPanel>
-        <ChartPanel title="Blocks by team" empty={!charts.team.length} emptyDetail="No action was blocked in this period." viewAll={data.blocks_by_team.truncated ? { href: '#/usage' } : null}>
-          <HBarList label="Blocks by team" items={charts.team} />
+        <ChartPanel title="Violations by team" empty={!charts.team.length} emptyDetail="No violations in this period." viewAll={data.violations_by_team.truncated ? { href: '#/usage' } : null}>
+          <HBarList label="Violations by team" items={charts.team} />
         </ChartPanel>
       </section>
       <section className="chart-grid chart-grid--single">
-        <ChartPanel title="Block rate by user, per 100 actions" empty={!charts.rate.length} emptyDetail={`No user had ${rate.min_actions ?? 20} or more prompts and tool calls in this period.`}
+        <ChartPanel title="Violation rate by user, per 100 actions" empty={!charts.rate.length} emptyDetail={`No user had ${rate.min_actions ?? 20} or more prompts and tool calls in this period.`}
           viewAll={rate.truncated ? { href: '#/usage' } : null}
           foot={rate.unranked ? `Users with fewer than ${rate.min_actions ?? 20} actions in this range are not ranked (${rate.unranked}).` : undefined}>
-          <HBarList label="Block rate by user" items={charts.rate} />
+          <HBarList label="Violation rate by user" items={charts.rate} />
         </ChartPanel>
       </section>
       <section className="panel table-panel">

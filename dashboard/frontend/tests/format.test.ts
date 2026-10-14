@@ -103,3 +103,13 @@ test('plain words for event types and bucket labels', () => {
   assert.equal(label2('2026-10-06', 'week'), 'Week of Oct 6');
   assert.equal(label2('2026-10-01', 'month'), 'Oct 2026');
 });
+
+import { drillHref, filterChips, toolWords } from '../src/format.ts';
+
+test('drill-down links and filter chips', () => {
+  assert.equal(drillHref('audit', { tool: 'execute_command', outcome: 'failed', user: '' }), '#/audit?tool=execute_command&outcome=failed');
+  assert.equal(drillHref('violations', {}), '#/violations');
+  const chips = filterChips(new URLSearchParams('tool=execute_command&outcome=failed&decision=observed&session=abcdef1234567'));
+  assert.deepEqual(chips.map((chip) => chip.label), ['Decision: Flagged', 'Session: abcdef12', 'Tool: Run command', 'Outcome: failed']);
+  assert.equal(toolWords('apply_diff'), 'Edit file');
+});

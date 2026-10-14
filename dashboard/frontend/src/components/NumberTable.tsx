@@ -8,15 +8,19 @@ export interface Column<T> {
   render: (row: T) => ReactNode;
   /** Value used for sorting and searching; columns without it are not sortable. */
   sort?: (row: T) => number | string | null | undefined;
+  /** Fixed width, e.g. "7rem". Numeric columns default to 7.5rem; others share the rest. */
+  width?: string;
+  /** Header hover text explaining the column. */
+  title?: string;
 }
 
 /**
  * Carbon table with search, sortable columns and 25-row pages.
  * Numeric columns align right with tabular figures.
  */
-export function NumberTable<T>({ columns, rows, rowKey, label, rowClass, pageSize: initialSize = 25, searchable = rows.length > 10 }: {
+export function NumberTable<T>({ columns, rows, rowKey, label, rowClass, pageSize: initialSize = 25, searchable = rows.length > 10, minWidth, rowHref }: {
   columns: Column<T>[]; rows: T[]; rowKey: (row: T) => string; label: string; rowClass?: (row: T) => string | undefined;
-  pageSize?: number; searchable?: boolean;
+  pageSize?: number; searchable?: boolean; minWidth?: string; rowHref?: (row: T) => string | undefined;
 }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<{ key: string; dir: 'ASC' | 'DESC' } | null>(null);
@@ -47,21 +51,23 @@ export function NumberTable<T>({ columns, rows, rowKey, label, rowClass, pageSiz
     <div className="number-table-wrap">
       {searchable && <Search size="sm" labelText={`Search ${label}`} placeholder={`Search ${label.toLowerCase()}`} value={query} onChange={(event) => { setQuery(event.currentTarget.value); setPage(1); }} className="table-search" />}
       <TableContainer className="event-table-wrap number-table">
-        <Table size="md" aria-label={label}>
+        <Table size="md" aria-label={label} className={`fixed-table${minWidth ? ' fixed-table--wide' : ''}`}>
+          <colgroup>{columns.map((column) => <col key={column.key} style={{ width: column.width ?? (column.numeric ? '7.5rem' : undefined) }} />)}</colgroup>
           <TableHead>
             <TableRow>
               {columns.map((column) => (
                 <TableHeader key={column.key} className={column.numeric ? 'num' : undefined} isSortable={!!column.sort}
                   sortDirection={sort?.key === column.key ? sort.dir : 'NONE'} isSortHeader={sort?.key === column.key}
                   onClick={column.sort ? () => toggle(column.key) : undefined}>
-                  {column.header}
+                  {column.title ? <span title={column.title}>{column.header}</span> : column.header}
                 </TableHeader>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
             {visible.map((row) => (
-              <TableRow key={rowKey(row)} className={rowClass?.(row)}>{columns.map((column) => <TableCell key={column.key} className={column.numeric ? 'num' : undefined}>{column.render(row)}</TableCell>)}</TableRow>
+              <TableRow key={rowKey(row)} className={[rowClass?.(row), rowHref?.(row) ? 'row--link' : ''].filter(Boolean).join(' ') || undefined}
+                onClick={rowHref?.(row) ? (event) => { if ((event.target as HTMLElement).closest('a,button')) return; window.location.hash = rowHref(row)!.replace(/^#/, ''); } : undefined}>{columns.map((column) => <TableCell key={column.key} className={column.numeric ? 'num' : undefined}>{column.render(row)}</TableCell>)}</TableRow>
             ))}
           </TableBody>
         </Table>

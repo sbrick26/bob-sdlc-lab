@@ -11,12 +11,12 @@ import re
 from datetime import timedelta
 from typing import Any, Callable
 
-from .metrics import control_point, mask
+from .metrics import control_point, is_ci, mask
 from .lab import _parse
 
 STATUS = {"blocked": "Blocked", "observed": "Flagged", "allowed": "Allowed", "error": "Error"}
 EVENT_TITLES = {
-    "UserPromptSubmit": "Prompt sent", "Stop": "Session ended", "SessionStart": "Session started",
+    "UserPromptSubmit": "Prompt sent", "Stop": "Turn ended", "SessionStart": "Session started",
     "PostToolUse": "Tool finished", "lab.pr_opened": "PR opened", "lab.ci_result": "CI review result",
     "lab.approved": "PR approved", "lab.merged": "PR merged", "lab.ticket_started": "Ticket started",
     "lab.ticket_done": "Ticket done",
@@ -79,8 +79,16 @@ def action(event: dict[str, Any]) -> tuple[str, str]:
         return "get an answer from Bob", "got an answer from Bob"
     if point == "Session start":
         return "start a Bob session", "started a Bob session"
-    kind = str(event.get("hook_event") or "").removeprefix("lab.").replace("_", " ")
-    return f"record {kind}", f"recorded {kind}"
+    kind = str(event.get("hook_event") or "").removeprefix("lab.")
+    pr = f"PR #{event['lab_pr']}" if event.get("lab_pr") is not None else "the PR"
+    verdict = ((event.get("lab_data") or {}).get("verdict") or "").upper()
+    lab_words = {
+        "ci_result": (f"review {pr}", f"reviewed {pr}" + (f": {verdict}" if verdict else "")),
+        "pr_opened": (f"open {pr}", f"opened {pr}"), "approved": (f"approve {pr}", f"approved {pr}"),
+        "merged": (f"merge {pr}", f"merged {pr}"), "ticket_started": ("start the ticket", "started the ticket"),
+        "ticket_done": ("finish the ticket", "finished the ticket"),
+    }
+    return lab_words.get(kind, (f"record {kind.replace('_', ' ')}", f"recorded {kind.replace('_', ' ')}"))
 
 
 def local_time(value: Any, tz_offset: int = 0) -> str | None:
@@ -94,7 +102,7 @@ def local_time(value: Any, tz_offset: int = 0) -> str | None:
 
 def sentence(event: dict[str, Any], tz_offset: int = 0) -> str:
     """"Sam tried to run a git command on KAN-205 at Oct 12, 12:43 PM." Missing parts are left out."""
-    person = str(event.get("user_name") or "Someone")
+    person = "CI review" if event.get("lab_role") == "ci-reviewer" or event.get("user_name") == "ci-reviewer" else str(event.get("user_name") or "Someone")
     person = person[:1].upper() + person[1:]
     present, past = action(event)
     verb = f"tried to {present}" if event.get("decision") == "blocked" else past
@@ -251,7 +259,7 @@ def build(
         "attempted": attempted(event, redact_fn) if event.get("rule_id") else None,
         "details": details(event, redact_fn),
         "context": _fields([
-            ("Person", event.get("user_name"), None),
+            ("User", "Automated review (CI)" if is_ci(event) else event.get("user_name"), None),
             ("Team", event.get("team"), None),
             ("Ticket", event.get("lab_ticket"), jira_link(event.get("lab_ticket"))),
             ("Branch", event.get("lab_branch"), None),
@@ -261,15 +269,15 @@ def build(
             ("Time", local_time(event.get("occurred_at"), tz_offset), None),
         ]),
         "technical": _fields([
-            ("Event", event.get("hook_event"), None),
+            ("Event", str(event.get("hook_event") or "").removeprefix("lab.") or None, None),
             ("Session source", event.get("session_source"), None),
             ("Control point", control_point(event) if not str(event.get("hook_event") or "").startswith("lab.") else None, None),
             ("Tool", event.get("tool_name"), None),
             ("Governance check time", f"{check_ms:g} ms" if isinstance(check_ms, (int, float)) else None, None),
             ("Tool run time", f"{tool_ms / 1000:.1f} s" if isinstance(tool_ms, (int, float)) else None, None),
+            ("Previous call round trip", f"{event['hook_rtt_prev_ms']} ms" if isinstance(event.get("hook_rtt_prev_ms"), int) else None, None),
             ("Device", event.get("device_name"), None),
             ("Severity", event.get("severity"), None),
-            ("Role", event.get("lab_role"), None),
             ("Event id", event.get("event_id"), None),
         ]),
     }

@@ -182,6 +182,8 @@ def clean_event(body: dict[str, Any], *, allow_content: bool = False) -> dict[st
             event[field] = None if value is None else min(max(int(value), 0), 10_000_000)
         elif field == "lab_cost":
             event[field] = None if value is None else float(value)
+        elif field == "hook_rtt_prev_ms":
+            event[field] = None if value is None else min(max(int(value), 0), 600_000)
         elif field == "check_ms":
             event[field] = None if value is None else round(min(max(float(value), 0.0), 60_000.0), 3)
         elif field in {"lab_tokens", "lab_turns"}:
@@ -564,6 +566,7 @@ async def ingest_hook(
     x_lab_tokens: str | None = Header(None, alias="X-Lab-Tokens"),
     x_lab_turns: str | None = Header(None, alias="X-Lab-Turns"),
     x_governance_team: str | None = Header(None, alias="X-Governance-Team"),
+    x_hook_prev_ms: str | None = Header(None, alias="X-Hook-Prev-Ms"),
 ) -> dict[str, Any]:
     """Receive Bob's native hook envelope, decide centrally, and store a redacted record."""
     started = time.perf_counter_ns()
@@ -753,6 +756,8 @@ async def ingest_hook(
         "lab_tokens": lab_count(x_lab_tokens, 10**12),
         "lab_turns": lab_count(x_lab_turns, 1_000_000),
         "team": safe_header(x_governance_team, summaries.TEAM_DEFAULT),
+        # Laptop-side round trip (network + server) of the previous governance call.
+        "hook_rtt_prev_ms": lab_count(x_hook_prev_ms, 600_000),
         "lab_path": tool_input_path(tool_input_raw),
         "session_source": safe_header(str(payload.get("source") or ""), "")[:40] or None if hook_event == "SessionStart" else None,
     }
@@ -777,7 +782,7 @@ def _scope(since: str | None, until: str | None, team: str | None, tz_offset: in
         raise HTTPException(422, "since and until must be dates (YYYY-MM-DD), since first") from exc
 
 
-def _audit_rows(filters: dict[str, Any], team: str | None, tz_offset: int | None) -> list[dict[str, Any]]:
+def _audit_rows(filters: dict[str, Any], team: str | None, tz_offset: int | None, outcome: str | None = None) -> list[dict[str, Any]]:
     """Filtered events with `team` attached. With tz_offset, date bounds are the viewer's local days."""
     filters = dict(filters)
     if tz_offset is not None and (filters.get("since") or filters.get("until")):
@@ -790,7 +795,11 @@ def _audit_rows(filters: dict[str, Any], team: str | None, tz_offset: int | None
     teams = summaries.team_map(db.all_events())
     for row in rows:
         row["team"] = teams.get(str(row.get("event_id")), summaries.TEAM_DEFAULT)
-    return [row for row in rows if not team or row["team"] == team]
+    rows = [row for row in rows if not team or row["team"] == team]
+    if outcome:
+        outcomes = summaries.tool_outcomes(db.all_events())
+        rows = [row for row in rows if outcomes.get(str(row.get("event_id"))) == outcome]
+    return rows
 
 
 @app.get("/api/v1/events", dependencies=[Depends(require_dashboard)])
@@ -802,13 +811,14 @@ def events(
     since: str | None = None, until: str | None = None, tz_offset: int | None = Query(None, ge=-840, le=840),
     q: str | None = None, limit: int = Query(250, ge=1, le=1000),
     sort: str = "time", direction: str = "desc",
+    outcome: str | None = Query(None, pattern="^(completed|failed|blocked)$"),
 ) -> dict[str, Any]:
     filters = {
         "user": user, "device": device, "profile": profile, "source": source, "decision": decision, "rule": rule,
         "severity": severity, "event": event, "tool": tool, "ticket": ticket, "role": role,
         "session": session, "since": since, "until": until, "q": q,
     }
-    rows = _audit_rows(filters, team, tz_offset)
+    rows = _audit_rows(filters, team, tz_offset, outcome)
     column = db.SORT_COLUMNS.get(sort, "occurred_at") if sort != "team" else "team"
     rows.sort(key=lambda row: (row.get(column) is not None, row.get(column) or ""), reverse=direction.lower() != "asc")
     rows = [{key: value for key, value in row.items() if key not in CONTENT_FIELDS} for row in rows[:limit]]
@@ -824,9 +834,10 @@ def events_csv(
     user: str | None = None, ticket: str | None = None, event: str | None = None,
     decision: str | None = None, since: str | None = None, until: str | None = None,
     team: str | None = None, session: str | None = None, tz_offset: int | None = Query(None, ge=-840, le=840),
+    tool: str | None = None, rule: str | None = None, outcome: str | None = Query(None, pattern="^(completed|failed|blocked)$"),
 ) -> Response:
     """Audit log export: metadata columns only, detail redacted and masked, no content."""
-    rows = _audit_rows(_export_filters(user, ticket, event, decision, since, until, session), team, tz_offset)
+    rows = _audit_rows({**_export_filters(user, ticket, event, decision, since, until, session), "tool": tool, "rule": rule}, team, tz_offset, outcome)
     buffer = io.StringIO()
     csv.writer(buffer).writerows(metrics.csv_rows(rows, redact))
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
@@ -841,9 +852,10 @@ def events_jsonl(
     user: str | None = None, ticket: str | None = None, event: str | None = None,
     decision: str | None = None, since: str | None = None, until: str | None = None,
     team: str | None = None, session: str | None = None, tz_offset: int | None = Query(None, ge=-840, le=840),
+    tool: str | None = None, rule: str | None = None, outcome: str | None = Query(None, pattern="^(completed|failed|blocked)$"),
 ) -> Response:
     """Audit log export as JSON Lines: same columns and redaction as the CSV."""
-    rows = _audit_rows(_export_filters(user, ticket, event, decision, since, until, session), team, tz_offset)
+    rows = _audit_rows({**_export_filters(user, ticket, event, decision, since, until, session), "tool": tool, "rule": rule}, team, tz_offset, outcome)
     body = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in metrics.export_records(rows, redact))
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
     return Response(

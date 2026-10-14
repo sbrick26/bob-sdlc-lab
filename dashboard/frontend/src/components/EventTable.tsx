@@ -18,7 +18,7 @@ export function EventTable({ events, onSelect, fresh }: { events: GovernanceEven
   const rows = events.map((event) => ({
     id: event.event_id,
     occurred_at: shortTime(event.occurred_at),
-    user_name: event.user_name,
+    user_name: event.lab_role === 'ci-reviewer' || event.user_name === 'ci-reviewer' ? 'Automated review (CI)' : event.user_name,
     team: event.team || '—',
     lab_ticket: event.lab_ticket || '—',
     hook_event: eventWords(event.hook_event),

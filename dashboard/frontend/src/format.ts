@@ -28,6 +28,11 @@ export function toUsd(coins: Num, rate: Num): number | null {
 export function minutes(value: Num): string {
   if (!finite(value)) return '—';
   if (value < 60) return `${Math.round(value)} min`;
+  if (value >= 1440) {
+    const days = Math.floor(value / 1440);
+    const hours = Math.round((value - days * 1440) / 60);
+    return `${days} ${days === 1 ? 'day' : 'days'}${hours ? ` ${hours} h` : ''}`;
+  }
   const hours = Math.floor(value / 60);
   const rest = Math.round(value - hours * 60);
   return rest ? `${hours} h ${rest} min` : `${hours} h`;
@@ -187,4 +192,36 @@ export function deltaText(pct: Num, days: number | null | undefined, better: Bet
   if (!better || pct === 0) return { text, tone: 'neutral' };
   const good = better === 'up' ? pct > 0 : pct < 0;
   return { text, tone: good ? 'good' : 'bad' };
+}
+
+const TOOL_WORDS: Record<string, string> = {
+  write_file: 'Write file', execute_command: 'Run command', read_file: 'Read file', apply_diff: 'Edit file',
+  insert_content: 'Insert into file', search_and_replace: 'Search and replace',
+};
+export const toolWords = (tool: string | null | undefined) => (tool ? TOOL_WORDS[tool] ?? tool.replace(/_/g, ' ') : '—');
+
+const CHIP_LABELS: Record<string, string> = {
+  user: 'User', ticket: 'Ticket', event: 'Event type', decision: 'Decision', session: 'Session', tool: 'Tool',
+  outcome: 'Outcome', rule: 'Rule', team: 'Team',
+};
+
+/** Removable chips for the drill-down filters in a page URL ("Tool: Run command ×"). */
+export function filterChips(params: URLSearchParams): Array<{ key: string; label: string }> {
+  const chips: Array<{ key: string; label: string }> = [];
+  for (const key of Object.keys(CHIP_LABELS)) {
+    const value = params.get(key);
+    if (!value) continue;
+    const shown = key === 'tool' ? toolWords(value) : key === 'event' ? eventWords(value)
+      : key === 'decision' ? DECISION_WORDS[value] ?? value : key === 'session' ? value.slice(0, 8) : value;
+    chips.push({ key, label: `${CHIP_LABELS[key]}: ${shown}` });
+  }
+  return chips;
+}
+
+/** A hash link with drill-down filters, dropping empty values. */
+export function drillHref(page: string, filters: Record<string, string | null | undefined>): string {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => value && params.set(key, value));
+  const query = params.toString();
+  return `#/${page}${query ? `?${query}` : ''}`;
 }
