@@ -110,6 +110,6 @@ say "  Dashboard     $LAB_DASHBOARD_URL"
 say "  Pull requests https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A$NAME"
 say "  Lab guide     https://github.com/sbrick26/bob-sdlc-lab/blob/main/docs/participant-guide.md"
 say ""
-say "Next: in Bob IDE pick the SDLC mode and type: check my tickets"
+say "Next: in Bob IDE pick the SDLC Agent mode and type: check my tickets"
 say "The first Jira call opens a browser: sign in with your Jira login above."
 if [ "$(uname)" = Darwin ]; then open -a "IBM Bob" "$(pwd)" 2>/dev/null || true; fi

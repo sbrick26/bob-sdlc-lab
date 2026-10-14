@@ -1,9 +1,9 @@
-# Bob SDLC plugin. Pick "SDLC" and say "check my tickets": it works out the ticket's stage and switches to the
+# Bob SDLC plugin. Pick "SDLC Agent" and say "check my tickets": it works out the ticket's stage and switches to the
 # mode for that stage. Narrow tools per stage is the control (Plan can only edit plans/).
 # Do not add allowedSubagents: listing presets pins spawns to read-only behavior.
 customModes:
   - slug: sdlc
-    name: "SDLC"
+    name: "SDLC Agent"
     description: Start here. Say "check my tickets" and Bob takes your ticket through plan, build and review.
     whenToUse: Any work on a Jira ticket in this repo, from picking it up to fixing review findings.
     roleDefinition: >-
@@ -69,9 +69,9 @@ customModes:
       - mode
 
   - slug: sdlc-review
-    name: "SDLC Review (CI)"
-    description: Used by CI to review a pull request against its spec. People do not need it.
-    whenToUse: In CI on every PR.
+    name: "SDLC Review"
+    description: Review a change against its spec. CI uses it on every pull request; you can use it before opening one.
+    whenToUse: In CI on every PR, or when you want a review of your branch before the PR.
     roleDefinition: >-
       You are the reviewer on the FieldOps team. You judge one change against its spec in plans/<KEY>.md, the rules
       in .bob/plugins/bob-sdlc/rules, and the PR checklist. You may run the tests. You do not edit files. You end with

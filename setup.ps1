@@ -129,6 +129,6 @@ Write-Host "  Dashboard     $DashboardUrl"
 Write-Host "  Pull requests https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A$Name"
 Write-Host "  Lab guide     https://github.com/sbrick26/bob-sdlc-lab/blob/main/docs/participant-guide.md"
 Write-Host ""
-Write-Host "Next: in Bob IDE pick the SDLC mode and type: check my tickets"
+Write-Host "Next: in Bob IDE pick the SDLC Agent mode and type: check my tickets"
 Write-Host "The first Jira call opens a browser: sign in with your Jira login above."
 if ($bobExe) { Start-Process -FilePath $bobExe -ArgumentList "`"$PWD`"" }
