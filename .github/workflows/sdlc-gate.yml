@@ -363,7 +363,7 @@ jobs:
             exit 0
           fi
           gh pr view "$num" --repo "$GITHUB_REPOSITORY" \
-            --json number,url,author,headRefName,additions,deletions,reviews,mergedBy,body > "$RUNNER_TEMP/pr.json"
+            --json number,url,author,headRefName,additions,deletions,reviews,mergedBy > "$RUNNER_TEMP/pr.json"
           head="$(jq -r .headRefName "$RUNNER_TEMP/pr.json")"
           rounds="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow sdlc-gate.yml --branch "$head" \
                     --event pull_request --limit 100 --json databaseId --jq 'length' || echo 1)"
@@ -385,19 +385,14 @@ jobs:
         env:
           KEY: ${{ steps.pr.outputs.key }}
           ROUNDS: ${{ steps.pr.outputs.rounds }}
-          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
-          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
-          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
         run: |
           if [ -z "$DASHBOARD_URL" ] || [ -z "$DASHBOARD_TOKEN" ]; then
             echo "dashboard: DASHBOARD_URL/DASHBOARD_TOKEN not set, skipping merged"
             exit 0
           fi
           python3 - > "$RUNNER_TEMP/merged.json" <<'PY'
-          import json, os, re
+          import json, os
           pr = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "pr.json")))
-          m = re.search(r"without Bob:\s*\**\s*([0-9]+(?:\.[0-9]+)?)", pr.get("body") or "", re.I)
-          without_bob = float(m.group(1)) if m else None
           approvers = [r["author"]["login"] for r in (pr.get("reviews") or [])
                        if r.get("state") == "APPROVED" and r.get("author")]
           approver = approvers[-1] if approvers else ((pr.get("mergedBy") or {}).get("login") or "")
@@ -414,7 +409,6 @@ jobs:
                   "approver": approver,
                   "review_rounds": rounds,
                   "lines_changed": int(pr.get("additions", 0)) + int(pr.get("deletions", 0)),
-                  "without_bob_hours": without_bob,
               },
           }))
           PY
@@ -423,18 +417,6 @@ jobs:
             -H "Authorization: Bearer $DASHBOARD_TOKEN" -H "Content-Type: application/json" \
             --data-binary "@$RUNNER_TEMP/merged.json" \
             || echo "dashboard: unreachable or refused, continuing (fail open)"
-          # The requester's estimate from Jira (Original estimate) is the per-ticket baseline.
-          if [ -n "$JIRA_BASE_URL" ] && [ -n "$JIRA_API_TOKEN" ] && [ -n "$KEY" ]; then
-            secs="$(curl -sS -m 15 -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "${JIRA_BASE_URL%/}/rest/api/3/issue/$KEY?fields=timeoriginalestimate" | jq -r '.fields.timeoriginalestimate // empty' || true)"
-            if [ -n "$secs" ]; then
-              jq -n --arg k "$KEY" --arg u "$(jq -r .user "$RUNNER_TEMP/merged.json")" --argjson h "$(echo "$secs / 3600" | bc -l)" \
-                '{kind:"ticket_estimate", user:$u, ticket:$k, pr:null, data:{hours:$h, source:"jira"}}' > "$RUNNER_TEMP/estimate.json"
-              curl -sS -m 15 -X POST "${DASHBOARD_URL%/}/api/v1/lab/events" -H "Authorization: Bearer $DASHBOARD_TOKEN" \
-                -H "Content-Type: application/json" --data-binary "@$RUNNER_TEMP/estimate.json" || echo "dashboard: estimate not sent"
-            else
-              echo "jira: no original estimate on $KEY"
-            fi
-          fi
 
       - name: Move the Jira ticket to Done
         if: steps.pr.outputs.found == 'true'
