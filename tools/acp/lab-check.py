@@ -199,7 +199,7 @@ def pr_for(branch):
 
 def safe_branch(name, key):
     br = f"{name}/{key}"
-    if not re.fullmatch(r"[a-z]+/[A-Z][A-Z0-9]+-\d+", br) or br in ("main", "master"):
+    if not re.fullmatch(r"[a-z]+/[A-Z][A-Z0-9]+-\d+", br) or br in ("main", "master", "demo-dev"):
         raise SystemExit(f"refusing unsafe branch name {br!r}")
     return br
 
@@ -251,7 +251,7 @@ class Lane:
         if os.path.exists(self.dir):
             raise RuntimeError(f"{self.dir} exists: run `lab-check.sh clean {self.name}` first")
         with GitLock():
-            sh(["git", "worktree", "add", self.dir, "-B", self.branch, "origin/main"], check=True)
+            sh(["git", "worktree", "add", self.dir, "-B", self.branch, "origin/demo-dev"], check=True)
         with open(os.path.join(self.dir, "lab.env"), "w") as f:
             f.write(f"LAB_USER={self.name}\nLAB_ROLE=participant\nLAB_TICKET={self.key}\n"
                     f"DASHBOARD_URL={DASH}\nDASHBOARD_TOKEN={INGEST}\nLAB_CHANNEL=acp\nLAB_GH_TOKEN={_DE.get('LAB_GH_TOKEN', '')}\n")
@@ -468,11 +468,11 @@ class Lane:
         # F: build
         def build_state():
             d = self.dir
-            tests_changed = [f for f in sh(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=d).stdout.split() if f.startswith("tests/")]
+            tests_changed = [f for f in sh(["git", "diff", "--name-only", "origin/demo-dev...HEAD"], cwd=d).stdout.split() if f.startswith("tests/")]
             py = sh([".venv/bin/python", "-m", "pytest", "-q"], cwd=d, timeout=300)
             tail = (py.stdout.strip().splitlines() or [""])[-1]
             cf = os.path.join(d, "changes", f"{K}.md"); changelog = os.path.exists(cf) and K in open(cf).read()
-            commits = int(sh(["git", "rev-list", "--count", "origin/main..HEAD"], cwd=d).stdout.strip() or 0)
+            commits = int(sh(["git", "rev-list", "--count", "origin/demo-dev..HEAD"], cwd=d).stdout.strip() or 0)
             pushed = bool(sh(["git", "ls-remote", "origin", f"refs/heads/{self.branch}"], cwd=d, timeout=60).stdout.strip())
             pr = pr_for(self.branch)
             st, (_, ctext) = jira_status(K), jira_comments(K, self.t0 - 5)
@@ -498,7 +498,7 @@ class Lane:
             if not s.get("commits"):
                 parts.append("Nothing is committed on the branch. Commit with the key first.")
             if not s.get("pushed") or not s.get("pr"):
-                parts.append(f"The PR is not open yet. Push the branch and open the PR with ./scripts/lab-gh pr create --base main --label {N} --title \"{K}: {self.title}\".")
+                parts.append(f"The PR is not open yet. Push the branch and open the PR with ./scripts/lab-gh pr create --base demo-dev --label {N} --title \"{K}: {self.title}\".")
             if s.get("jira") != "In Review" or not s.get("jira_pr_link"):
                 parts.append(f"Jira {K} is {s.get('jira')} and pr-link-in-comment={s.get('jira_pr_link')}: add a comment with the PR link and move it to In Review.")
             return " ".join(parts) or "Finish the build skill steps."
@@ -571,7 +571,7 @@ def cmd_run(names, serial, detour):
     if st != 200:
         sys.exit(f"dashboard not reachable ({st}); local: cd dashboard && ./run-local.sh &")
     with GitLock():
-        sh(["git", "fetch", "origin", "main"], check=True, timeout=120)
+        sh(["git", "fetch", "origin", "main", "demo-dev"], check=True, timeout=120)
     sh(["uvx", "--from", "mcp-atlassian==0.23.1", "mcp-atlassian", "--help"], timeout=300)  # warm the uvx cache
     t = time.time()
     if serial:

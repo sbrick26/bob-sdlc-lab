@@ -5,6 +5,10 @@ checks:
     says: "You are on a ticket branch, not main."
     type: branch_not
     value: main
+  - id: branch-not-demo-dev
+    says: "You are on a ticket branch, not demo-dev."
+    type: branch_not
+    value: demo-dev
   - id: plan-exists
     says: "A spec exists at plans/{KEY}.md."
     type: file_exists

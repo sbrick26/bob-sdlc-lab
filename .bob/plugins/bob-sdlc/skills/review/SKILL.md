@@ -10,7 +10,7 @@ Ticket: $1 (take it from the branch name when empty). If you are not in the sdlc
 
 # Review
 
-Inputs: a ticket key (from the branch name, pattern <name>/<KEY>) and a diff (`git diff main...HEAD` or the file given).
+Inputs: a ticket key (from the branch name, pattern <name>/<KEY>) and a diff (`git diff origin/demo-dev...HEAD` or the file given).
 
 1. Read plans/<KEY>.md. If it is missing, FAIL with one blocking finding.
 2. Read the diff. For each file changed, check it is in Work units. Outside: blocking finding.

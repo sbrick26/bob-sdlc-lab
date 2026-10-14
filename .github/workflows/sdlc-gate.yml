@@ -27,10 +27,10 @@ name: sdlc-gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, demo-dev]
     types: [opened, synchronize, reopened]
   push:
-    branches: [main]
+    branches: [main, demo-dev]
 
 permissions:
   contents: read
@@ -109,6 +109,7 @@ jobs:
       BRANCH: ${{ github.event.pull_request.head.ref }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
     steps:
       - name: Set work paths
         run: |
@@ -181,8 +182,8 @@ jobs:
           echo "key=$key" >> "$GITHUB_OUTPUT"
           # The hooks read the branch name, so leave detached HEAD.
           git checkout -q -B "$BRANCH"
-          git fetch -q origin main
-          git diff origin/main...HEAD > pr.diff
+          git fetch -q origin "$BASE_REF"
+          git diff "origin/$BASE_REF...HEAD" > pr.diff
           echo "ticket $key, branch $BRANCH, diff $(wc -l < pr.diff) lines"
 
       - name: Write lab.env for the hooks
@@ -335,7 +336,7 @@ jobs:
 
   merged:
     name: merged
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/demo-dev'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}

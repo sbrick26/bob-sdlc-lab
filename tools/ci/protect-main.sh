@@ -7,7 +7,8 @@
 set -euo pipefail
 
 REPO="${REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
-ENDPOINT="repos/$REPO/branches/main/protection"
+BRANCH="${BRANCH:-main}"
+ENDPOINT="repos/$REPO/branches/$BRANCH/protection"
 
 if [ "${1:-}" = "--show" ]; then
   gh api -H "Accept: application/vnd.github+json" "$ENDPOINT" || {
@@ -33,4 +34,4 @@ gh api -X PUT -H "Accept: application/vnd.github+json" "$ENDPOINT" --input - <<'
   "allow_deletions": false
 }
 JSON
-echo "main protection applied on $REPO"
+echo "$BRANCH protection applied on $REPO"
