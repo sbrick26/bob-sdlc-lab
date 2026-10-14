@@ -1,36 +1,105 @@
 # store.py - work order storage
-# everything lives in one CSV file. read it all, write it all.
-# TODO fix later (2014): two people saving at once can lose an edit
+# orders live in SQLite (fieldops.db); crews live in crews.csv
 import csv
 import os
+import sqlite3
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
-ORDERS_FILE = os.path.join(DATA_DIR, "work_orders.csv")
+DEFAULT_DB = os.path.join(DATA_DIR, "fieldops.db")
 CREWS_FILE = os.path.join(DATA_DIR, "crews.csv")
 
-FIELDS = ["id", "site", "equipment", "description", "priority", "status",
-          "crew", "customer_name", "customer_phone", "created"]
+FIELDS = [
+    "id",
+    "site",
+    "equipment",
+    "description",
+    "priority",
+    "status",
+    "crew",
+    "customer_name",
+    "customer_phone",
+    "created",
+]
+
+
+def _get_db_path():
+    return os.environ.get("FIELDOPS_DB", DEFAULT_DB)
+
+
+def _row_to_order(row):
+    if row is None:
+        return None
+    return {
+        "id": int(row[0]),
+        "site": row[1] if row[1] is not None else "",
+        "equipment": row[2] if row[2] is not None else "",
+        "description": row[3] if row[3] is not None else "",
+        "priority": int(row[4]) if row[4] is not None else 3,
+        "status": row[5] if row[5] is not None else "",
+        "crew": row[6] if row[6] is not None else "",
+        "customer_name": row[7] if row[7] is not None else "",
+        "customer_phone": row[8] if row[8] is not None else "",
+        "created": row[9] if row[9] is not None else "",
+    }
 
 
 def load_orders():
-    orders = []
-    f = open(ORDERS_FILE, newline="")
-    for row in csv.DictReader(f):
-        row["id"] = int(row["id"])
-        row["priority"] = int(row["priority"] or 3)
-        orders.append(row)
-    f.close()
-    return orders
+    db_path = _get_db_path()
+    if not os.path.exists(db_path):
+        return []
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, site, equipment, description, priority, status, crew, customer_name, customer_phone, created FROM work_orders ORDER BY id"
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return [_row_to_order(row) for row in rows]
 
 
 def save_orders(orders):
-    # rewrite the whole file every time
-    f = open(ORDERS_FILE, "w", newline="")
-    w = csv.DictWriter(f, fieldnames=FIELDS)
-    w.writeheader()
+    db_path = _get_db_path()
+    os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS work_orders (
+            id INTEGER PRIMARY KEY,
+            site TEXT,
+            equipment TEXT,
+            description TEXT,
+            priority INTEGER,
+            status TEXT,
+            crew TEXT,
+            customer_name TEXT,
+            customer_phone TEXT,
+            created TEXT
+        )
+        """
+    )
+    cur.execute("DELETE FROM work_orders")
     for o in orders:
-        w.writerow(dict((k, o.get(k, "")) for k in FIELDS))
-    f.close()
+        cur.execute(
+            """
+            INSERT INTO work_orders (id, site, equipment, description, priority, status, crew, customer_name, customer_phone, created)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                int(o["id"]),
+                o.get("site", "") or "",
+                o.get("equipment", "") or "",
+                o.get("description", "") or "",
+                int(o.get("priority") or 3),
+                o.get("status", "") or "",
+                o.get("crew", "") or "",
+                o.get("customer_name", "") or "",
+                o.get("customer_phone", "") or "",
+                o.get("created", "") or "",
+            ),
+        )
+    conn.commit()
+    conn.close()
 
 
 def load_crews():
@@ -44,22 +113,39 @@ def load_crews():
 
 
 def get_order(order_id):
-    for o in load_orders():
-        if o["id"] == int(order_id):
-            return o
-    return None
+    db_path = _get_db_path()
+    if not os.path.exists(db_path):
+        return None
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, site, equipment, description, priority, status, crew, customer_name, customer_phone, created FROM work_orders WHERE id = ?",
+        (int(order_id),),
+    )
+    row = cur.fetchone()
+    conn.close()
+    return _row_to_order(row)
 
 
 def update_order(order_id, **fields):
-    orders = load_orders()
-    found = None
-    for o in orders:
-        if o["id"] == int(order_id):
-            for k in fields:
-                if k in FIELDS and k != "id":
-                    o[k] = fields[k]
-            found = o
-    if found is None:
+    db_path = _get_db_path()
+    if not os.path.exists(db_path):
         return None
-    save_orders(orders)
-    return found
+
+    valid_fields = {k: v for k, v in fields.items() if k in FIELDS and k != "id"}
+    if not valid_fields:
+        return get_order(order_id)
+
+    set_clause = ", ".join(f"{k} = ?" for k in valid_fields.keys())
+    values = list(valid_fields.values())
+    values.append(int(order_id))
+
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(f"UPDATE work_orders SET {set_clause} WHERE id = ?", values)
+    if cur.rowcount == 0:
+        conn.close()
+        return None
+    conn.commit()
+    conn.close()
+    return get_order(order_id)
