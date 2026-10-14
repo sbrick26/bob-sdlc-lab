@@ -6,6 +6,19 @@ from fieldops import store
 SITES = ["North Substation", "South Substation", "East Yard", "West Depot"]
 
 
+def mask_phone(phone):
+    # keep the first six digits, hide the last four
+    digits_seen = 0
+    out = ""
+    for ch in phone:
+        if ch.isdigit():
+            digits_seen = digits_seen + 1
+            out = out + (ch if digits_seen <= 6 else "*")
+        else:
+            out = out + ch
+    return out
+
+
 def daily_report():
     orders = store.load_orders()
     out = "SEQUOIA POWER & LIGHT - FIELDOPS DAILY REPORT\n"
@@ -19,7 +32,7 @@ def daily_report():
         for o in rows:
             out = out + "  #" + str(o["id"]) + " P" + str(o["priority"]) + " " + o["status"].ljust(8)
             out = out + " crew " + (o["crew"] or "-") + "  " + o["equipment"].ljust(11)
-            out = out + " " + o["customer_name"] + " " + o["customer_phone"] + "\n"
+            out = out + " " + o["customer_name"] + " " + mask_phone(o["customer_phone"]) + "\n"
     closed = len([o for o in orders if o["status"] == "closed"])
     out = out + "\nClosed orders on file: " + str(closed) + "\n"
     return out
