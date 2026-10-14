@@ -22,4 +22,4 @@ Facts that save you turns:
 - PR: `./scripts/lab-gh pr create --base demo-dev --label <user> --title "<KEY>: <title>" --body-file <file>`. The body starts with `Opened by <name> for <KEY>.` then the sections of .github/pull_request_template.md.
 - The pr-gate hook runs before every push and PR. If it refuses, it prints the missing checklist item. Fix that item. Never add --no-verify.
 - Self-review subagent prompt: "Compare `git diff origin/demo-dev...HEAD` with plans/<KEY>.md. List each acceptance criterion as met or not met with evidence. List any file changed outside Work units. Nothing else."
-- At the end: comment the PR link on the Jira ticket, move it to In Review, say CI is now reviewing the pull request, and end with the "Your links" block.
+- At the end: comment the PR link on the Jira ticket, move it to In Review, say CI is now reviewing the pull request, switch back to the sdlc mode (SDLC Agent) and say so, and end with the "Your links" block.

@@ -19,4 +19,5 @@ Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-plan mode; switch t
    - post one Jira comment headed "Spec for review" with the understood paragraph, design decisions, open questions and acceptance criteria (under 30 lines);
    - move the ticket to In Review;
    - tell the user: "The spec is on the ticket. The requester approves by commenting Approved there. Then start a new chat and say check my tickets, and I will build it."
-7. End with the "Your links" block from the tickets skill.
+7. Switch back to the sdlc mode (SDLC Agent) and say so in one line, so the next "check my tickets" starts from there.
+8. End with the "Your links" block from the tickets skill.

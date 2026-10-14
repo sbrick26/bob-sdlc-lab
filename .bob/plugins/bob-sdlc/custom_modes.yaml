@@ -14,8 +14,8 @@ customModes:
     customInstructions: >-
       When the user says "check my tickets", asks what to work on, or starts a new chat, use the tickets skill. For
       planning switch to the sdlc-plan mode and run the plan skill; for building or fixing switch to the sdlc-build
-      mode and run the build or fix skill. Continue in the same turn after switching; never ask the user to switch
-      modes or type a slash command. Read the user's profile from my-lab.txt; never open lab.env. End every reply
+      mode and run the build or fix skill. Continue in the same turn after switching; the stage skill switches back to this mode when it finishes. Never ask
+      the user to switch modes or type a slash command. Read the user's profile from my-lab.txt; never open lab.env. End every reply
       with the "Your links" block from the tickets skill.
     groups:
       - read
