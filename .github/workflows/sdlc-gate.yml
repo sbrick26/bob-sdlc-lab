@@ -304,7 +304,7 @@ jobs:
               passed, total = v.get("tests_passed"), v.get("tests_total")
           print(json.dumps({
               "kind": "ci_result",
-              "user": os.environ["PR_AUTHOR"],
+              "user": (os.environ["BRANCH"].split("/", 1)[0] if "/" in os.environ["BRANCH"] else os.environ["PR_AUTHOR"]),
               "ticket": os.environ.get("KEY", ""),
               "pr": int(os.environ["PR_NUMBER"]),
               "data": {
@@ -402,7 +402,7 @@ jobs:
               rounds = 1
           print(json.dumps({
               "kind": "merged",
-              "user": (pr.get("author") or {}).get("login", ""),
+              "user": ((pr.get("headRefName") or "").split("/", 1)[0] if "/" in (pr.get("headRefName") or "") else (pr.get("author") or {}).get("login", "")),
               "ticket": os.environ.get("KEY", ""),
               "pr": pr["number"],
               "data": {
