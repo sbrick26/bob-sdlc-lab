@@ -11,10 +11,23 @@ function Has($c)  { [bool](Get-Command $c -ErrorAction SilentlyContinue) }
 Write-Host "1. Checking what the lab needs"
 $needs = @()
 if (Has git)    { Ok 'git' }    else { Miss 'git';    $needs += 'Git.Git' }
-$py = $null
-foreach ($c in @('py','python','python3')) { if (Has $c) { $py = $c; break } }
-if ($py)       { Ok "python ($py)" } else { Miss 'python'; $needs += 'Python.Python.3.12' }
-if (Has gh)     { Ok 'gh' }     else { Miss 'gh';     $needs += 'GitHub.cli' }
+# Find a real Python 3.10+: skip the Microsoft Store placeholder (WindowsApps) and launchers that answer nothing.
+function Find-Python {
+  $cands = @()
+  foreach ($n in @('python','python3')) {
+    Get-Command $n -All -ErrorAction SilentlyContinue | Where-Object { $_.Source -and $_.Source -notmatch 'WindowsApps' } | ForEach-Object { $cands += ,@($_.Source) }
+  }
+  if (Get-Command py -ErrorAction SilentlyContinue) { $cands += ,@('py','-3') }
+  foreach ($c in $cands) {
+    $exe = $c[0]; $rest = @(); if ($c.Count -gt 1) { $rest = $c[1..($c.Count - 1)] }
+    try { $out = & $exe @rest -c 'import sys;print(sys.executable if sys.version_info>=(3,10) else "")' 2>$null } catch { $out = $null }
+    $line = @($out | Where-Object { $_ -and $_.Trim() }) | Select-Object -First 1
+    if ($line -and (Test-Path $line.Trim())) { return $line.Trim() }
+  }
+  return $null
+}
+$pyExe = Find-Python
+if ($pyExe) { Ok "python ($pyExe)" } else { Miss 'python 3.10+'; $needs += 'Python.Python.3.12' }
 if ($needs.Count -gt 0) {
   if (Has winget) {
     $a = Read-Host "Install $($needs -join ', ') with winget now? [y/N]"
@@ -26,14 +39,9 @@ if ($needs.Count -gt 0) {
   }
   Write-Host "Install $($needs -join ', ') (winget or the vendor sites), then run setup.ps1 again."; exit 1
 }
-$pyArgs = if ($py -eq 'py') { @('-3') } else { @() }
-& $py @pyArgs -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"
-if ($LASTEXITCODE -ne 0) { Write-Host 'Python 3.10 or newer is needed.'; exit 1 }
-
 # Bob's hooks run "python3 ...". Windows Python seldom provides python3, so add a small shim on the user PATH.
 $shimDir = Join-Path $env:USERPROFILE '.bob-lab\bin'
 New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
-$pyExe = (& $py @pyArgs -c "import sys; print(sys.executable)").Trim()
 Set-Content -Path (Join-Path $shimDir 'python3.cmd') -Value "@echo off`r`n`"$pyExe`" %*" -Encoding ASCII
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 if (-not ($userPath -split ';' | Where-Object { $_ -eq $shimDir })) {
@@ -93,7 +101,7 @@ git fetch -q origin demo-dev 2>$null
 
 Write-Host ""
 Write-Host "3. Setting up the app"
-if (-not (Test-Path '.venv')) { & $py @pyArgs -m venv .venv }
+if (-not (Test-Path '.venv')) { & $pyExe -m venv .venv }
 & .\.venv\Scripts\python.exe -m pip install -q --disable-pip-version-check -r requirements.txt pytest
 Ok 'FieldOps app and tests'
 try { $r = Invoke-WebRequest -Uri "$DashboardUrl/healthz" -UseBasicParsing -TimeoutSec 8; Ok 'Lab dashboard reachable' }
