@@ -44,7 +44,7 @@ flowchart LR
 | Close and measure | CI job `merged` | `tools/ci/jira_transition.py`, governance dashboard | Ticket to Done; dashboard Delivery page |
 | Change the rules | skill `/new-check` | `skills/new-check/SKILL.md` | Protected path, platform PR, owner review |
 
-Hooks fail open. If the dashboard is down, Bob continues. CI and branch protection are the controls that hold. For enforced hooks and an MCP gateway, see [docs/enterprise](enterprise/README.md).
+Hooks fail open. If the dashboard is down, Bob continues. CI and branch protection are the controls that hold. For enterprise rollout, an admin can make the hooks mandatory with the EnforcedHooks group policy and put an MCP gateway in front of Jira; the facilitator covers both.
 
 ## The software-factory view
 
