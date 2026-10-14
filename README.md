@@ -10,7 +10,9 @@ cd bob-sdlc-lab && ./lab-setup/mac-setup.sh      # macOS and Linux
 # Windows: cd bob-sdlc-lab; powershell -ExecutionPolicy Bypass -File .\lab-setup\windows-setup.ps1
 ```
 
-Setup asks which lab profile is yours and for the tokens on your card. It writes `lab.env` and `my-lab.txt` at the repo root and the app's virtual environment in `fieldops-repo/.venv`. Open the repo root (`bob-sdlc-lab/`) in Bob IDE; then, in Bob IDE, pick the **SDLC Agent** mode and say: `check my tickets`. The [participant guide](docs/participant-guide.md) walks through the hour.
+Setup asks for your lab profile number and the two tokens on your card (dashboard token, GitHub lab token). It writes `lab.env` and `my-lab.txt` at the repo root and the app's virtual environment in `fieldops-repo/.venv`. Open the repo root (`bob-sdlc-lab/`) in Bob IDE. Pick the **SDLC Agent** mode and say: `check my tickets`. Bob asks `Start <KEY>?`; say `yes`, answer the design questions (or `Use the defaults.`), then `I approve`. When the requester comments `Approved` on the Jira ticket, start a new chat in **SDLC Agent** and say `check my tickets` again: Bob builds and opens a pull request into `demo-dev`. You never type a slash command or switch modes by hand.
+
+The [participant guide](docs/participant-guide.md) walks through the hour. The [lab page](docs/lab.html) shows the same steps with copy buttons (download it and open it in a browser).
 
 ## The process, and the Bob feature behind each step
 
