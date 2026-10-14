@@ -2,7 +2,7 @@
 # Do not add allowedSubagents: listing presets pins spawns to read-only behavior.
 customModes:
   - slug: sdlc-plan
-    name: "1. Plan"
+    name: "SDLC Plan"
     description: Turn a ticket into a spec. No code, no commands.
     whenToUse: At the start of any ticket. Use after "check my tickets" picks one.
     roleDefinition: >-
@@ -29,7 +29,7 @@ customModes:
       - mode
 
   - slug: sdlc-build
-    name: "2. Build"
+    name: "SDLC Build"
     description: Implement an approved spec. Tests first. Ends in a PR.
     whenToUse: After the requester approved plans/<KEY>.md. Use /build <KEY>.
     roleDefinition: >-
@@ -53,7 +53,7 @@ customModes:
       - mode
 
   - slug: sdlc-review
-    name: "3. Review"
+    name: "SDLC Review"
     description: Review a change against its spec. Used by CI and by people.
     whenToUse: In CI on every PR, or when a person asks for a review before merging.
     roleDefinition: >-

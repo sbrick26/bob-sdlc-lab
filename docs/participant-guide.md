@@ -24,7 +24,7 @@ You need: Bob IDE 2.2.2 or newer (signed in), git, python3, a modern browser, an
 3. It asks for the `Dashboard token from your card:` and then the `Dashboard URL from your card:`. Type both from the card.
 4. It writes `lab.env`, sets your git name and email for this repo, and installs the Python packages. It ends with: `Ready, <name>. Open this folder in Bob IDE, then say: check my tickets`.
 5. On a Mac, Bob IDE opens the folder for you. If not, open the `bob-sdlc-lab` folder in Bob IDE yourself.
-6. Open the mode list in the chat panel. The lab modes are at the end: `1. Plan`, `2. Build`, `3. Review`.
+6. Open the mode list in the chat panel. The lab modes are at the end: `SDLC Plan`, `SDLC Build`, `SDLC Review`.
 7. Sign in to Jira. The first time Bob uses Jira, Bob IDE opens a browser for the Atlassian sign-in. Use the Jira login and password on your card. If no browser opens, go to Bob Settings > MCP and click Authenticate on the `atlassian` server.
 
 ## 8 to 12 min: check my tickets
@@ -38,7 +38,7 @@ Bob never picks a ticket assigned to someone else.
 
 ## 12 to 25 min: plan and approve
 
-1. Type `/plan <KEY>`, for example `/plan KAN-157`. Bob switches to `1. Plan`. In this mode Bob can write only markdown under `plans/` and has no command tool.
+1. Type `/plan <KEY>`, for example `/plan KAN-157`. Bob switches to `SDLC Plan`. In this mode Bob can write only markdown under `plans/` and has no command tool.
 2. Bob reads the ticket and the files it names, then writes `plans/<KEY>.md` with these headings:
 
    | Heading | What it says |
@@ -61,7 +61,7 @@ Bob never picks a ticket assigned to someone else.
 
 ## 25 to 40 min: build
 
-1. Type `/build <KEY>`. Bob switches to `2. Build` and follows a fixed order:
+1. Type `/build <KEY>`. Bob switches to `SDLC Build` and follows a fixed order:
    1. Create the branch `<lab id>/<KEY>`, for example `sam/KAN-157`.
    2. Write the tests from the acceptance criteria. Run them. They fail first.
    3. Change only the Work units files.
@@ -113,7 +113,7 @@ Bob never picks a ticket assigned to someone else.
    |---|---|
    | tests | runs `python -m pytest -q` |
    | protected-paths | fails if the PR touches `.bob/`, `.github/`, `governance/`, `tools/` or `dashboard/` |
-   | bob-review | Bob in `3. Review` mode judges the diff against your plan, with the rules taken from main |
+   | bob-review | Bob in `SDLC Review` mode judges the diff against your plan, with the rules taken from main |
 
 3. bob-review posts one PR comment with a verdict block: `VERDICT`, `CRITERIA`, `FINDINGS`, `RULES`, `TESTS`. No verdict means fail.
 4. Main needs all three checks green and one approving review. The guide approves. Wait for the guide.
@@ -145,7 +145,7 @@ Then open Activity (every event, with the rule that fired) and Users (activity b
 | Problem | Fix |
 |---|---|
 | Jira sign-in did not open | Bob Settings > MCP, find `atlassian`, click Authenticate. Signed in as the wrong person: click "Reset auth", then Authenticate again. |
-| The mode list has no `1. Plan` | Check that Bob IDE is 2.2.2 or newer and that you opened the `bob-sdlc-lab` folder itself, not a parent folder. Reload the window. Scroll to the end of the mode list. |
+| The mode list has no `SDLC Plan` | Check that Bob IDE is 2.2.2 or newer and that you opened the `bob-sdlc-lab` folder itself, not a parent folder. Reload the window. Scroll to the end of the mode list. |
 | The hook blocked something you meant to do | Read the reason. It names the rule. If the action is truly needed, ask the guide. Do not work around it. |
 | CI failed | Open the PR comment. Fix each blocking finding or failed test, then push again. protected-paths fails: remove changes to protected folders. |
 | The PR gate refuses | The sentence names the missing item. Fix that item. Never add `--no-verify` or `--force`. |

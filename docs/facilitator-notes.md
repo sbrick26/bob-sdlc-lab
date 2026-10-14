@@ -29,7 +29,7 @@ Say this, in your own words:
 
 | Time | Step | Watch for | Say |
 |---|---|---|---|
-| 0-8 | Setup | `start.sh` asks for name, token, URL. Mode list shows `1. Plan`, `2. Build`, `3. Review` at the end. Atlassian sign-in opens a browser. | "Use the login on your card, not your own account." Wrong account: "Bob Settings > MCP, Reset auth." |
+| 0-8 | Setup | `start.sh` asks for name, token, URL. Mode list shows `SDLC Plan`, `SDLC Build`, `SDLC Review` at the end. Atlassian sign-in opens a browser. | "Use the login on your card, not your own account." Wrong account: "Bob Settings > MCP, Reset auth." |
 | 8-12 | check my tickets | Each person sees only their own ticket. Bob asks `Start <KEY>?` and waits. | "Bob acts as you in Jira. Jira decides what you can see." |
 | 12-25 | Plan | `plans/<KEY>.md` with nine headings. Ticket moves to In Review. | "Plan mode cannot run commands or write code. Narrow tools per stage is the control." Then: "Approve with `approve. I am <Name> Lab, the requester.`" |
 | 25-40 | Build | Tests fail first, then pass. Branch is `<lab id>/<KEY>`. Watch for the detour prompt. | Detour: "Now try the detour prompt on your card's step." After the block: "Look at the Lab page. Your Blocks count went up." |
