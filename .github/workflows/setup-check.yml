@@ -39,13 +39,19 @@ jobs:
         run: |
           $env:Path = "$env:USERPROFILE\.bob-lab\bin;$env:Path"
           cmd /c "python3 --version"; if ($LASTEXITCODE -ne 0) { throw 'python3 shortcut does not run' }
-      - name: Run a Bob hook the way Bob calls it on Windows (cmd /c)
+      - name: Run a Bob hook the way Bob calls it on Windows (cmd /c, raw stdin)
         run: |
+          $ErrorActionPreference = 'Continue'
           $env:Path = "$env:USERPROFILE\.bob-lab\bin;$env:Path"
-          '{"hook_event_name":"SessionStart","source":"startup","session_id":"setup-check","cwd":"."}' | cmd /c "python3 .bob/hooks/gov.py"
-          if ($LASTEXITCODE -ne 0) { throw "gov.py exit $LASTEXITCODE (expected 0: dashboard rejects the dummy token, hook fails open)" }
-          '{"hook_event_name":"PreToolUse","tool_name":"execute_command","tool_input":{"command":"git push origin main"}}' | cmd /c "python3 .bob/hooks/pr_gate.py"
-          if ($LASTEXITCODE -ne 2) { throw "pr_gate.py exit $LASTEXITCODE (expected 2: push from main is refused)" }
+          [IO.File]::WriteAllText("$PWD\p1.json", '{"hook_event_name":"SessionStart","source":"startup","session_id":"setup-check","cwd":"."}')
+          [IO.File]::WriteAllText("$PWD\p2.json", '{"hook_event_name":"PreToolUse","tool_name":"execute_command","tool_input":{"command":"git push origin main"}}')
+          cmd /c "python3 .bob/hooks/gov.py < p1.json 2>nul"
+          $rc1 = $LASTEXITCODE
+          cmd /c "python3 .bob/hooks/pr_gate.py < p2.json"
+          $rc2 = $LASTEXITCODE
+          Write-Host "gov.py exit $rc1 (expected 0, fails open on the dummy token); pr_gate.py exit $rc2 (expected 2)"
+          if ($rc1 -ne 0 -or $rc2 -ne 2) { exit 1 }
+          exit 0
       - name: Check push credentials come from lab.env
         run: |
           $out = "protocol=https`nhost=github.com`n`n" | git credential fill
