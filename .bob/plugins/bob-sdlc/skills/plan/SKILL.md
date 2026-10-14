@@ -1,22 +1,22 @@
 ---
 name: plan
-description: Write the spec for a ticket. Turns one Jira ticket into plans/<KEY>.md in the required plan format, posts the summary to Jira, moves the ticket to In Review, asks the requester to approve. Use in Plan mode or when the user runs /plan <KEY>.
+description: Plan a ticket: ask the user the design questions, write the spec plans/<KEY>.md with the answers and any open questions, review it in chat, and on "I approve" post it to Jira and move the ticket to In Review for the requester. Used by the tickets skill at stage 2, or directly with /plan <KEY> to re-plan.
 metadata:
   user-invocable: true
   argument-hint: <TICKET-KEY>
 ---
 
-Ticket: $1. If you are not in the sdlc-plan mode, switch to it first.
+Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-plan mode; switch to it if you are not in it.
 
-# Spec
+# Plan
 
-1. Read the ticket (getJiraIssue on the hosted server, jira_get_issue on atlassian-token). Read tickets/ in the repo if a matching file exists; it may carry hints.
-2. Read only the files the ticket names and their direct imports. Do not survey the whole repo.
-3. Write plans/<KEY>.md using the plan format in your mode rules. Acceptance criteria come from the ticket's "Done when" list, rewritten so each is checkable.
-4. Work units must stay inside the files the ticket allows. If the ticket's "touches" list conflicts with what you need, write it under Open questions with your default.
-5. Post one Jira comment: the "What I understood" paragraph, the acceptance criteria, and the path plans/<KEY>.md. Keep it under 15 lines.
-6. Move the ticket to In Review (transitionJiraIssue, or jira_get_transitions then jira_transition_issue).
-7. If CONFLUENCE_SPACE is set in the environment, also create a Confluence page titled "<KEY> spec" under the parent page named "FieldOps specs" with the same content, using the Confluence create tool.
-8. Stop with: "Spec posted. Requester: approve with a Jira comment that starts with Approved, or reply approve here, or tell me what to change."
-
-When the requester approves (in chat, or with a Jira comment that starts with "Approved"): set the line `Requester approval: approved by <name>` in the plan as plain text, no bold and no backticks (the PR gate matches it exactly); for a Jira approval write `Requester approval: approved by <name> in Jira on <YYYY-MM-DD>` and add the comment link on the next line, move the ticket back to In Progress, add the comment "Spec approved by <name>", and say "Run /build <KEY>."
+1. Read the ticket (getJiraIssue or jira_get_issue) and tickets/ in the repo if a matching file exists. Read only the files it names and their direct imports.
+2. Ask 2 to 4 design questions, numbered, each with your proposed default, in one message. Ask only what changes the design: for example the database file location, how to roll back, which fields to mask, what the agent may change. Stop and wait for the answers. "Use the defaults" is a valid answer.
+3. Write plans/<KEY>.md in the plan format from your mode rules. Record each question, the answer and what it changes under Design decisions. Put anything still undecided under Open questions with a default.
+4. Show the spec in chat: the "What I understood" paragraph, the design decisions, open questions and acceptance criteria. Ask: "Reply **I approve** to send it to the requester, or tell me what to change."
+5. If the user asks for changes, update the spec and show it again.
+6. On "I approve":
+   - post one Jira comment headed "Spec for review" with the understood paragraph, design decisions, open questions and acceptance criteria (under 30 lines);
+   - move the ticket to In Review;
+   - tell the user: "The spec is on the ticket. The requester approves by commenting Approved there. Then start a new chat and say check my tickets, and I will build it."
+7. End with the "Your links" block from the tickets skill.

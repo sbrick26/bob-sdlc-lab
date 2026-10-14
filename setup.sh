@@ -75,6 +75,18 @@ DASHBOARD_TOKEN=$DASH_TOKEN
 LAB_GH_TOKEN=$GH_LAB_TOKEN
 ENV
 chmod 600 lab.env
+case "$NAME" in sam|priya) TEAM=Platform;; jordan|alex) TEAM="Field Apps";; *) TEAM=unassigned;; esac
+case "$NAME" in sam) TICKET=KAN-157;; priya) TICKET=KAN-158;; jordan) TICKET=KAN-159;; alex) TICKET=KAN-160;; *) TICKET="";; esac
+cat > my-lab.txt <<PROFILE
+user=$NAME
+name=$FULL
+team=$TEAM
+ticket=$TICKET
+jira_ticket=https://demo-ibm-bob.atlassian.net/browse/$TICKET
+jira_board=https://demo-ibm-bob.atlassian.net/jira/software/projects/KAN/boards
+prs=https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A$NAME
+dashboard=$LAB_DASHBOARD_URL/#/audit?user=$NAME
+PROFILE
 git config user.name "$FULL"
 git config user.email "$NAME@lab.sequoia.example"
 # Push as the shared lab account, for this folder only. Your own GitHub login is not touched.
@@ -89,9 +101,6 @@ say "3. Setting up the app"
 code=$(curl -s -o /dev/null -w '%{http_code}' -m 8 "$LAB_DASHBOARD_URL/healthz" || echo 000)
 [ "$code" = 200 ] && ok "Lab dashboard reachable" || miss "Lab dashboard not reachable ($code); tell the facilitator. The lab still works."
 
-case "$NAME" in
-  sam) TICKET=KAN-157;; priya) TICKET=KAN-158;; jordan) TICKET=KAN-159;; alex) TICKET=KAN-160;; *) TICKET="(ask the facilitator)";;
-esac
 say ""
 say "Ready, $FULL. Your details:"
 say "  Ticket        $TICKET"
@@ -101,6 +110,6 @@ say "  Dashboard     $LAB_DASHBOARD_URL"
 say "  Pull requests https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A$NAME"
 say "  Lab guide     https://github.com/sbrick26/bob-sdlc-lab/blob/main/docs/participant-guide.md"
 say ""
-say "Next: in Bob IDE pick the SDLC Plan mode and type: check my tickets"
+say "Next: in Bob IDE pick the SDLC mode and type: check my tickets"
 say "The first Jira call opens a browser: sign in with your Jira login above."
 if [ "$(uname)" = Darwin ]; then open -a "IBM Bob" "$(pwd)" 2>/dev/null || true; fi

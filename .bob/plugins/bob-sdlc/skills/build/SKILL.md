@@ -1,24 +1,25 @@
 ---
 name: build
-description: Implement an approved plans/<KEY>.md tests first, self-review, open the PR, update Jira. Use in the Build mode or when the user runs /build <KEY>.
+description: Build an approved ticket: tests first, code, self-review, pull request to demo-dev, Jira update. Used by the tickets skill at stage 4, or directly with /build <KEY>.
 metadata:
   user-invocable: true
   argument-hint: <TICKET-KEY>
 ---
 
-Ticket: $1. If you are not in the sdlc-build mode, switch to it first. Stop after the PR is open and the Jira ticket is In Review.
+Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-build mode; switch to it if you are not in it.
 
 # Build
 
-Preconditions: plans/<KEY>.md exists and says "Requester approval: approved". If it does not, read the ticket's Jira comments. If a comment from someone other than you starts with "Approved", write `Requester approval: approved by <author> in Jira on <YYYY-MM-DD>` and the comment link into the plan, then continue. If there is no approval anywhere, stop and say so.
+Preconditions: plans/<KEY>.md exists, and the Jira ticket has a comment starting with "Approved" from someone other than you after the "Spec for review" comment. Write `Requester approval: approved by <author> in Jira on <YYYY-MM-DD>` and the comment link into the plan. If plans/<KEY>.md is missing on this machine, rebuild it from the "Spec for review" comment. If there is no approval, stop and say the spec is waiting for the requester.
 
-Follow the build order in your mode rules exactly. Facts that save you turns:
+1. Move the ticket to In Progress and comment "Build started".
+2. Follow the build order in your mode rules exactly.
 
+Facts that save you turns:
+- Tests: `.venv/bin/python -m pytest -q`. Tests must not change data/work_orders.csv; copy it to a temp dir in a fixture.
+- The user name for the branch is the user line in my-lab.txt. Never open lab.env.
 - Change note: write changes/<KEY>.md, never CHANGELOG.md.
-- Tests: `python -m pytest -q`. Python is `python3` on macOS. Create .venv with `./run.sh` if imports fail.
-- The store is CSV until ticket 2 lands. Tests must not change data/work_orders.csv; copy it to a temp dir in a fixture.
-- Branch: `git checkout -b <lab name>/<KEY>`. The lab name is the LAB_USER line in lab.env at the repo root (read it). If the file is missing, ask.
-- PR: `./scripts/lab-gh pr create --base demo-dev --label <lab name> --title "<KEY>: <title>" --body-file <file>`. It runs gh as the shared lab account, so nobody signs in to GitHub. The body starts with `Opened by <Name> Lab for <KEY>.` then the sections of .github/pull_request_template.md.
+- PR: `./scripts/lab-gh pr create --base demo-dev --label <user> --title "<KEY>: <title>" --body-file <file>`. The body starts with `Opened by <name> for <KEY>.` then the sections of .github/pull_request_template.md.
 - The pr-gate hook runs before every push and PR. If it refuses, it prints the missing checklist item. Fix that item. Never add --no-verify.
 - Self-review subagent prompt: "Compare `git diff origin/demo-dev...HEAD` with plans/<KEY>.md. List each acceptance criterion as met or not met with evidence. List any file changed outside Work units. Nothing else."
-- Jira at the end: add a comment with the PR link (addOrEditJiraIssueComment or jira_add_comment), then move the ticket to In Review (transitionJiraIssue, or jira_get_transitions then jira_transition_issue).
+- At the end: comment the PR link on the Jira ticket, move it to In Review, say CI is now reviewing the pull request, and end with the "Your links" block.

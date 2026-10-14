@@ -1,29 +1,31 @@
 ---
 name: tickets
-description: "Check my tickets": list the Jira tickets assigned to the signed-in user, recommend one, and start it on a yes. Use when the user asks what to work on, says "check my tickets", or runs /tickets.
+description: "Check my tickets": find the user's Jira ticket, work out its stage from Jira and GitHub, and continue with the right skill (plan, build or fix) in the same turn. Use when the user says "check my tickets", asks what to work on, or starts a new chat.
 metadata:
   user-invocable: true
 ---
 
 # Check my tickets
 
-You act as the signed-in user through the Jira MCP server. Jira knows who that is.
+1. Read my-lab.txt at the repo root. It has user, name, team, ticket and the links. Never open lab.env.
+2. Find the user's open tickets in Jira, acting as the signed-in user:
+   - Hosted Atlassian server: getAccessibleAtlassianResources once for the cloudId, then searchJiraIssuesUsingJql.
+   - Token server: jira_search.
+   - JQL: `assignee = currentUser() AND status != Done ORDER BY priority ASC, created ASC`. If the environment variable LAB_JQL_OVERRIDE is set, use that JQL instead.
+3. If there is more than one, show a short table (key, title, status) and pick the one in my-lab.txt, or ask.
+4. Work out the stage with the stage guide in your mode rules (Jira status, the ticket's comments, the pull request and its checks). Say the stage in one line, for example "KAN-158 is approved by the requester and has no pull request yet, so I am starting the build."
+5. Continue in the same turn:
+   - Stage 1: ask "Start <KEY>?" and stop. On yes, move it to In Progress, comment "Started with Bob", switch to the sdlc-plan mode and run the plan skill.
+   - Stage 2: switch to the sdlc-plan mode and run the plan skill.
+   - Stage 4: switch to the sdlc-build mode and run the build skill.
+   - Stage 5: switch to the sdlc-build mode and run the fix skill.
+   - Stages 3, 6, 7: say what is happening and who acts next. Stop.
+6. End every reply with:
 
-Jira actions and the tool names you may see (use whichever server is connected):
+   **Your links**
+   - Ticket: <jira_ticket from my-lab.txt>
+   - Jira board: <jira_board>
+   - Your pull requests: <prs>
+   - Your activity on the dashboard: <dashboard>
 
-| Action | Atlassian hosted server (OAuth) | atlassian-token server |
-|---|---|---|
-| find my site id | getAccessibleAtlassianResources (first id = cloudId) | not needed |
-| search | searchJiraIssuesUsingJql | jira_search |
-| read one | getJiraIssue | jira_get_issue |
-| change status | transitionJiraIssue (if hidden: discover, then executeWrite) | jira_get_transitions then jira_transition_issue |
-| comment | addOrEditJiraIssueComment (same discover path) | jira_add_comment |
-
-Steps:
-1. Search with JQL: `assignee = currentUser() AND status != Done ORDER BY status DESC, priority ASC, created ASC`, fields summary, status, priority, description.
-2. Show a short table: key, title, status, priority. One line per ticket. No descriptions yet.
-3. Recommend one: In Progress first, else the highest priority To Do. One sentence why.
-4. Ask "Start <KEY>?" and stop. Do not start without a yes.
-5. On yes: move the ticket to In Progress, add the comment "Started with Bob", then continue straight into planning: follow the plan skill for that ticket in the same turn (write plans/<KEY>.md, post the summary to Jira, move it to In Review, ask the requester to approve). Do not ask the user to run /plan.
-
-Never pick a ticket assigned to someone else. If the search returns nothing, say so and suggest asking the lead.
+Never pick a ticket assigned to someone else.

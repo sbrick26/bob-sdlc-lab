@@ -93,6 +93,14 @@ if (-not $DashToken -or -not $GhToken) { Write-Host 'Both tokens from your card 
   "LAB_USER=$Name", 'LAB_ROLE=participant', 'LAB_TEAM=',
   "DASHBOARD_URL=$DashboardUrl", "DASHBOARD_TOKEN=$DashToken", "LAB_GH_TOKEN=$GhToken"
 ) | Set-Content -Path 'lab.env' -Encoding ASCII
+$Team = @{ 'sam'='Platform'; 'priya'='Platform'; 'jordan'='Field Apps'; 'alex'='Field Apps' }[$Name]
+@(
+  "user=$Name", "name=$Full", "team=$Team", "ticket=$Ticket",
+  "jira_ticket=https://demo-ibm-bob.atlassian.net/browse/$Ticket",
+  'jira_board=https://demo-ibm-bob.atlassian.net/jira/software/projects/KAN/boards',
+  "prs=https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A$Name",
+  "dashboard=$DashboardUrl/#/audit?user=$Name"
+) | Set-Content -Path 'my-lab.txt' -Encoding ASCII
 git config user.name "$Full"
 git config user.email "$Name@lab.sequoia.example"
 # Push as the shared lab account, for this folder only. Git for Windows runs this helper with its bundled sh.
@@ -121,6 +129,6 @@ Write-Host "  Dashboard     $DashboardUrl"
 Write-Host "  Pull requests https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A$Name"
 Write-Host "  Lab guide     https://github.com/sbrick26/bob-sdlc-lab/blob/main/docs/participant-guide.md"
 Write-Host ""
-Write-Host "Next: in Bob IDE pick the SDLC Plan mode and type: check my tickets"
+Write-Host "Next: in Bob IDE pick the SDLC mode and type: check my tickets"
 Write-Host "The first Jira call opens a browser: sign in with your Jira login above."
 if ($bobExe) { Start-Process -FilePath $bobExe -ArgumentList "`"$PWD`"" }

@@ -34,7 +34,7 @@
         ]
       },
       {
-        "matcher": "^(execute_command|write_file|apply_diff|insert_content|search_and_replace)$",
+        "matcher": "^(execute_command|write_file|apply_diff|insert_content|search_and_replace|read_file)$",
         "hooks": [
           {
             "type": "command",

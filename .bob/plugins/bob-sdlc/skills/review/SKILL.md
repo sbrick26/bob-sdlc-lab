@@ -6,7 +6,7 @@ metadata:
   argument-hint: [TICKET-KEY]
 ---
 
-Ticket: $1 (take it from the branch name when empty). If you are not in the sdlc-review mode, switch to it first. End with the verdict block.
+Ticket: $1 (take it from the branch name when empty). End with the verdict block.
 
 # Review
 
