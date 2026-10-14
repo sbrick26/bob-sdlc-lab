@@ -432,3 +432,11 @@ def test_tool_and_outcome_filters():
     assert client.get("/api/v1/events?outcome=bogus", auth=AUTH).status_code == 422
     old = [row("2026-03-02T10:00:00Z", "PreToolUse", tool_name="x", tool_use_id="lost")]
     assert set(summaries.tool_outcomes(old).values()) == {"failed"}
+
+
+def test_decision_violation_filter():
+    hook("UserPromptSubmit", "viol-pat", "VPT-1", prompt="token sk-abcdefghijklmnopqrstuvwxyz1234567890")
+    hook("UserPromptSubmit", "viol-pat", "VPT-1", prompt="hello")
+    listed = client.get("/api/v1/events?user=viol-pat&decision=violation", auth=AUTH).json()
+    assert listed["count"] == 1 and listed["events"][0]["decision"] == "blocked"
+    assert client.get("/api/v1/events.csv?user=viol-pat&decision=violation", auth=AUTH).text.count("\n") == 2

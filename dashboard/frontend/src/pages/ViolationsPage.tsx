@@ -2,6 +2,7 @@ import { SimpleBarChart } from '@carbon/charts-react';
 import { Renew } from '@carbon/icons-react';
 import { Button, DataTable, Pagination, Tab, TabList, TabPanel, TabPanels, Table, TableBody, TableCell, TableContainer, TableHead, TableHeader, TableRow, Tabs, Tag } from '@carbon/react';
 import { useMemo, useState } from 'react';
+import { openBucket, useBarClick } from '../components/useBarClick';
 import { api } from '../api';
 import { ChartPanel } from '../components/ChartPanel';
 import { DecisionTag } from '../components/DecisionTag';
@@ -53,6 +54,8 @@ export function ViolationsPage() {
 function ViolationsTab({ data }: { data: ViolationsSummary }) {
   const dark = useDarkMode();
   const { filters } = useFilters();
+  const tableRows = data.rows;
+  const timeClick = useBarClick((datum) => openBucket(datum.day, data.granularity, { decision: 'violation' }));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const drawer = useEventDrawer();
@@ -62,29 +65,29 @@ function ViolationsTab({ data }: { data: ViolationsSummary }) {
     time: data.over_time.map((item) => ({ group: 'Violations', key: bucketLabel(item.day, data.granularity), value: item.violations, day: item.day })),
     rule: data.by_rule.items.map((item) => ({
       label: item.other ? item.rule_id : item.rule_name || item.rule_id, other: item.other, value: item.violations, display: count(item.violations),
-      color: item.other ? '#8d8d8d' : severityColor(item.severity, dark), href: item.other ? undefined : drillHref('violations', { rule: item.rule_id }),
+      color: item.other ? '#8d8d8d' : severityColor(item.severity, dark), href: item.other ? undefined : drillHref('audit', { rule: item.rule_id, decision: 'violation' }),
       tip: { title: item.rule_name || item.rule_id, rows: [{ label: 'Violations', value: count(item.violations) }, ...(item.severity ? [{ label: 'Severity', value: item.severity }] : [])] },
     })),
     user: data.by_user.items.map((item, index) => ({
       label: item.user, other: item.other, value: item.violations, display: count(item.violations), color: item.other ? '#8d8d8d' : neutral(index, dark),
-      href: item.other ? undefined : drillHref('violations', { user: item.user }),
+      href: item.other ? undefined : drillHref('audit', { user: item.user, decision: 'violation' }),
       tip: { title: item.user, rows: [{ label: 'Violations', value: count(item.violations) }] },
     })),
     team: data.violations_by_team.items.map((item) => ({
       label: item.team, other: item.other, value: item.violations, display: count(item.violations), color: item.other ? '#8d8d8d' : colors[item.team] ?? slot(0, dark),
-      href: item.other ? undefined : drillHref('violations', { team: item.team }),
+      href: item.other ? undefined : drillHref('audit', { team: item.team, decision: 'violation' }),
       tip: { title: item.team, rows: [{ label: 'Violations', value: count(item.violations), color: colors[item.team] }] },
     })),
     rate: data.rate_by_user.items.map((item, index) => ({
       label: item.other ? `${item.user}, average` : item.user, other: item.other, value: item.violation_rate, display: `${item.violation_rate.toFixed(1)} per 100`,
-      color: item.other ? '#8d8d8d' : neutral(index, dark), href: item.other ? undefined : drillHref('violations', { user: item.user }),
+      color: item.other ? '#8d8d8d' : neutral(index, dark), href: item.other ? undefined : drillHref('audit', { user: item.user, decision: 'violation' }),
       tip: { title: item.user, rows: [{ label: 'Violation rate', value: `${item.violation_rate.toFixed(1)} per 100 actions` }, { label: 'Violations', value: count(item.violations) }, { label: 'Actions', value: count(item.actions) }] },
     })),
   }), [data, dark, colors]);
   const k = data.kpis;
   const days = data.period_days;
   const per = data.granularity === 'day' ? 'Violations over time' : `Violations over time, per ${data.granularity}`;
-  const visible = data.rows.slice((page - 1) * pageSize, page * pageSize);
+  const visible = tableRows.slice((page - 1) * pageSize, page * pageSize);
   const byId = new Map<string, ViolationRow>(visible.map((row) => [row.event_id, row]));
   const rows = visible.map((row) => ({
     id: row.event_id, time: shortTime(row.occurred_at), user: row.user, team: row.team, ticket: row.ticket || '—',
@@ -101,7 +104,7 @@ function ViolationsTab({ data }: { data: ViolationsSummary }) {
       </section>
       <section className="chart-grid chart-grid--single">
         <ChartPanel title={per} empty={!charts.time.some((item) => item.value > 0)} emptyDetail="No violations in this period.">
-          <SimpleBarChart data={charts.time} options={{ ...baseOptions(dark, '220px'), axes: { bottom: { mapsTo: 'key', scaleType: 'labels' }, left: { mapsTo: 'value', ...countTicks(Math.max(0, ...charts.time.map((item) => item.value))) } }, legend: { enabled: false }, color: { scale: { Violations: slot(0, dark) } }, ...simpleTip({ Violations: slot(0, dark) }, 'Violations', (d) => count(d.value)) } as never} />
+          <SimpleBarChart ref={timeClick as never} data={charts.time} options={{ ...baseOptions(dark, '220px'), axes: { bottom: { mapsTo: 'key', scaleType: 'labels' }, left: { mapsTo: 'value', ...countTicks(Math.max(0, ...charts.time.map((item) => item.value))) } }, legend: { enabled: false }, color: { scale: { Violations: slot(0, dark) } }, ...simpleTip({ Violations: slot(0, dark) }, 'Violations', (d) => count(d.value)) } as never} />
         </ChartPanel>
       </section>
       <section className="chart-grid chart-grid--three chart-grid--even">
@@ -123,8 +126,8 @@ function ViolationsTab({ data }: { data: ViolationsSummary }) {
         </ChartPanel>
       </section>
       <section className="panel table-panel">
-        <div className="panel__header"><h2>Violations ({count(data.rows.length)})</h2></div>
-        {data.rows.length ? (
+        <div className="panel__header"><h2>Violations ({count(tableRows.length)})</h2></div>
+        {tableRows.length ? (
           <>
             <DataTable rows={rows} headers={headers}>
               {({ rows: tableRows, headers: tableHeaders, getHeaderProps, getRowProps, getTableProps }) => (
@@ -151,7 +154,7 @@ function ViolationsTab({ data }: { data: ViolationsSummary }) {
                 </TableContainer>
               )}
             </DataTable>
-            <Pagination page={page} pageSize={pageSize} pageSizes={[10, 25, 50, 100]} totalItems={data.rows.length} onChange={({ page: next, pageSize: size }) => { setPage(next); setPageSize(size); }} />
+            <Pagination page={page} pageSize={pageSize} pageSizes={[10, 25, 50, 100]} totalItems={tableRows.length} onChange={({ page: next, pageSize: size }) => { setPage(next); setPageSize(size); }} />
           </>
         ) : <EmptyState title="No violations" detail="Blocked and flagged actions in this period appear here." />}
       </section>

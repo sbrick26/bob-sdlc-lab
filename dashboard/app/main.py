@@ -785,6 +785,10 @@ def _scope(since: str | None, until: str | None, team: str | None, tz_offset: in
 def _audit_rows(filters: dict[str, Any], team: str | None, tz_offset: int | None, outcome: str | None = None) -> list[dict[str, Any]]:
     """Filtered events with `team` attached. With tz_offset, date bounds are the viewer's local days."""
     filters = dict(filters)
+    # decision=violation: every rule hit, blocked or flagged.
+    violations_only = filters.get("decision") == "violation"
+    if violations_only:
+        filters["decision"] = None
     if tz_offset is not None and (filters.get("since") or filters.get("until")):
         start, end = _scope(filters.get("since"), filters.get("until"), None, tz_offset).utc_bounds()
         filters["since"] = start
@@ -796,6 +800,8 @@ def _audit_rows(filters: dict[str, Any], team: str | None, tz_offset: int | None
     for row in rows:
         row["team"] = teams.get(str(row.get("event_id")), summaries.TEAM_DEFAULT)
     rows = [row for row in rows if not team or row["team"] == team]
+    if violations_only:
+        rows = [row for row in rows if row.get("rule_id") and row.get("decision") in {"blocked", "observed"}]
     if outcome:
         outcomes = summaries.tool_outcomes(db.all_events())
         rows = [row for row in rows if outcomes.get(str(row.get("event_id"))) == outcome]

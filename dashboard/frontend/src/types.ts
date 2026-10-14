@@ -32,7 +32,7 @@ export interface EventDetails {
 export interface SessionSummary {
   session_id: string; short_id: string; user: string | null; team: string | null; ticket: string | null;
   started_at: string | null; ended_at: string | null; duration_minutes: number | null; turns: number | null;
-  bobcoins: number | null; usd: number | null; tokens: number | null; blocks: number; events: number;
+  bobcoins: number | null; usd: number | null; tokens: number | null; violations: number; events: number;
   per_turn: Array<{ index: number; occurred_at: string; bobcoins: number | null; turns: number | null; tokens: number | null }>;
 }
 export interface EventView {
@@ -50,7 +50,7 @@ export interface EventView {
   technical?: DetailField[];
 }
 
-export interface Facets { users: string[]; decisions: string[]; events: string[]; tickets?: string[]; teams?: string[] }
+export interface Facets { users: string[]; decisions: string[]; events: string[]; tickets?: string[]; teams?: string[]; tools?: string[] }
 
 export interface TopN<T> { items: Array<T & { other?: boolean; count?: number }>; total: number; truncated: boolean; unranked?: number; min_actions?: number; min_prs?: number }
 export type Granularity = 'day' | 'week' | 'month';

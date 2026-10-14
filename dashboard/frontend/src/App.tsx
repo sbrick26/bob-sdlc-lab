@@ -11,6 +11,7 @@ const UsagePage = lazy(() => import('./pages/UsagePage').then((module) => ({ def
 const DeliveryPage = lazy(() => import('./pages/DeliveryPage').then((module) => ({ default: module.DeliveryPage })));
 const PerformancePage = lazy(() => import('./pages/PerformancePage').then((module) => ({ default: module.PerformancePage })));
 const ViolationsPage = lazy(() => import('./pages/ViolationsPage').then((module) => ({ default: module.ViolationsPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage').then((module) => ({ default: module.AuditLogPage })));
 
 export function App() {
@@ -29,6 +30,7 @@ export function App() {
                 <Route path="performance" element={<PerformancePage />} />
                 <Route path="violations" element={<ViolationsPage />} />
                 <Route path="audit" element={<AuditLogPage />} />
+                <Route path="settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>

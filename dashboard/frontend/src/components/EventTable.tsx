@@ -1,5 +1,5 @@
 import { DataTable, Table, TableBody, TableCell, TableContainer, TableHead, TableHeader, TableRow } from '@carbon/react';
-import { eventWords, shortTime } from '../format';
+import { eventWords, shortTime, toolWords } from '../format';
 import type { GovernanceEvent } from '../types';
 import { DecisionTag } from './DecisionTag';
 
@@ -22,7 +22,7 @@ export function EventTable({ events, onSelect, fresh }: { events: GovernanceEven
     team: event.team || '—',
     lab_ticket: event.lab_ticket || '—',
     hook_event: eventWords(event.hook_event),
-    tool_name: event.tool_name || '—',
+    tool_name: event.tool_name ? toolWords(event.tool_name) : '—',
     rule_name: event.rule_name || '—',
     decision: event.decision,
   }));

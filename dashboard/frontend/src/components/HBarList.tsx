@@ -38,7 +38,13 @@ export function HBarList({ items, max, markers, empty, label }: { items: HBar[];
   // Scale to the largest named row; an "Other (N)" row never squashes the named rows.
   const top = Math.max(max ?? 0, ...items.filter((item) => !item.other).map((item) => item.value), ...(markers ?? []).map((marker) => marker.value)) || 1;
   const width = (value: number) => `${Math.min(value / top, 1) * 100}%`;
-  const move = (index: number) => (event: MouseEvent) => setHover({ index, x: event.clientX, y: event.clientY });
+  // Place the tooltip to the right of the value label at the bar end, never over the label column.
+  const move = (index: number) => (event: MouseEvent) => {
+    const row = event.currentTarget as HTMLElement;
+    const value = row.querySelector('.hbar__value') ?? row.querySelector('.hbar__fill');
+    const rect = value?.getBoundingClientRect();
+    setHover({ index, x: rect ? rect.right : event.clientX, y: rect ? rect.top + rect.height / 2 : event.clientY });
+  };
   return (
     <div className="hbar" role="list" aria-label={label} onMouseLeave={() => setHover(null)}>
       {items.map((item, index) => (

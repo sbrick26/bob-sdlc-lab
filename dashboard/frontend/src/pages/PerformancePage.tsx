@@ -7,7 +7,7 @@ import { ChartPanel } from '../components/ChartPanel';
 import { NumberTable, type Column } from '../components/NumberTable';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState, PageError, PageLoading } from '../components/States';
-import { bucketLabel, count, millis, seconds } from '../format';
+import { bucketLabel, count, drillHref, millis, seconds, toolWords } from '../format';
 import { useSummary } from '../hooks';
 import { baseOptions, colorScale, slot, tip, useDarkMode } from '../theme';
 import type { PerformanceSummary, Stats } from '../types';
@@ -29,7 +29,7 @@ export function PerformancePage() {
     return {
       unit: minutesScale ? 'min' : 's',
       answer: data.series.filter((item) => item.answer_typical_s != null).map((item) => ({ group: 'Typical answer time', key: label(item.day), value: toUnit(item.answer_typical_s), answers: item.answers })),
-      tools: data.series.filter((item) => item.tool_success_pct != null).map((item) => ({ group: 'Tool runs that succeed', date: new Date(`${item.day}T12:00:00`), key: label(item.day), value: item.tool_success_pct, runs: item.tool_runs })),
+      tools: data.series.filter((item) => item.tool_success_pct != null).map((item) => ({ group: 'Tool success rate', date: new Date(`${item.day}T12:00:00`), key: label(item.day), value: item.tool_success_pct, runs: item.tool_runs })),
     };
   }, [data]);
 
@@ -37,13 +37,15 @@ export function PerformancePage() {
   if (!data || !charts) return <PageError error={state.error || new Error('No performance data returned')} retry={state.reload} />;
   const k = data.kpis;
   const days = data.period_days;
-  const one = colorScale(['Tool runs that succeed'], dark);
+  const one = colorScale(['Tool success rate'], dark);
   const toolColumns: Column<ToolRow>[] = [
-    { key: 'tool', header: 'Tool', render: (row) => row.tool, sort: (row) => row.tool },
-    { key: 'runs', header: 'Runs', numeric: true, render: (row) => count(row.runs), sort: (row) => row.runs },
-    { key: 'success', header: 'Success', numeric: true, render: (row) => (row.success_pct == null ? '—' : `${row.success_pct.toFixed(1)}%`), sort: (row) => row.success_pct },
-    { key: 'typical', header: 'Typical time', numeric: true, render: (row) => seconds(row.typical_s), sort: (row) => row.typical_s },
+    { key: 'tool', header: 'Tool', render: (row) => toolWords(row.tool), sort: (row) => toolWords(row.tool) },
+    { key: 'runs', header: 'Runs', numeric: true, width: '5.5rem', render: (row) => count(row.runs), sort: (row) => row.runs },
+    { key: 'success', header: 'Success', numeric: true, width: '6rem', render: (row) => (row.success_pct == null ? '—' : `${row.success_pct.toFixed(1)}%`), sort: (row) => row.success_pct },
+    { key: 'failed', header: 'Failed', numeric: true, width: '5.5rem', render: (row) => (row.failures ? <a href={drillHref('audit', { tool: row.tool, outcome: 'failed' })}>{count(row.failures)}</a> : '0'), sort: (row) => row.failures },
+    { key: 'typical', header: 'Typical time', numeric: true, width: '7rem', render: (row) => seconds(row.typical_s), sort: (row) => row.typical_s },
   ];
+
   const e = data.engineering;
 
   return (
@@ -65,12 +67,12 @@ export function PerformancePage() {
 
       <h2 className="section-title">Tool reliability</h2>
       <section className="chart-grid">
-        <ChartPanel title="Tool runs that succeed (%)" empty={!charts.tools.length} emptyDetail="Appears when tools run in this period.">
-          <LineChart data={charts.tools} options={{ ...baseOptions(dark, '260px'), axes: { bottom: { mapsTo: 'key', scaleType: 'labels' }, left: { mapsTo: 'value', title: '%', domain: [Math.min(80, ...charts.tools.map((item) => item.value ?? 100)), 100] } }, curve: 'curveMonotoneX', points: { enabled: true, radius: 3 }, legend: { enabled: false }, color: { scale: one }, ...tip(one, (items) => ({ title: String(items[0]?.key ?? ''), rows: [{ label: 'Succeeded', value: `${items[0]?.value}%` }, { label: 'Tool runs', value: count(items[0]?.runs) }] })) } as never} />
+        <ChartPanel title="Tool success rate" empty={!charts.tools.length} emptyDetail="Appears when tools run in this period.">
+          <LineChart data={charts.tools} options={{ ...baseOptions(dark, '260px'), axes: { bottom: { mapsTo: 'key', scaleType: 'labels' }, left: { mapsTo: 'value', title: 'Tool runs that succeed (%)', domain: [0, 100] } }, curve: 'curveMonotoneX', points: { enabled: true, radius: 3 }, legend: { enabled: false }, color: { scale: one }, ...tip(one, (items) => ({ title: String(items[0]?.key ?? ''), rows: [{ label: 'Success rate', value: `${items[0]?.value}%` }, { label: 'Runs', value: `${Math.round(((items[0]?.value ?? 0) * (items[0]?.runs ?? 0)) / 100)} of ${items[0]?.runs ?? 0}` }] })) } as never} />
         </ChartPanel>
         <article className="panel chart-panel">
           <div className="panel__header"><h2>Tools</h2></div>
-          {data.tools.items.length ? <NumberTable label="Tools" columns={toolColumns} rows={data.tools.items} rowKey={(row) => row.tool} /> : <EmptyState title="No tool runs" detail="No tool ran in this period." />}
+          {data.tools.items.length ? <NumberTable label="Tools" columns={toolColumns} rows={data.tools.items} rowKey={(row) => row.tool} rowHref={(row) => (row.other ? undefined : drillHref('audit', { tool: row.tool }))} /> : <EmptyState title="No tool runs" detail="No tool ran in this period." />}
         </article>
       </section>
 

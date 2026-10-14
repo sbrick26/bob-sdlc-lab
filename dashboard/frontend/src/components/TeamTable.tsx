@@ -17,7 +17,7 @@ export function TeamTable({ rows, rate }: { rows: TeamRow[] | undefined; rate: n
     { key: 'budget', header: 'Budget used (this month)', width: '15.5rem', render: (row) => <BudgetCell spent={row.budget_bobcoins} budget={row.budget} pct={row.budget_used_pct} /> },
     { key: 'merged', header: 'PRs merged', numeric: true, width: '6rem', render: (row) => count(row.prs_merged) },
     { key: 'ttm', header: 'Median time to merge', numeric: true, width: '8.5rem', render: (row) => minutes(row.median_minutes_to_merge) },
-    { key: 'blocked', header: 'Violations', numeric: true, width: '6rem', render: (row) => <a href={`#/violations?team=${encodeURIComponent(row.team)}`}>{count(row.violations)}</a> },
+    { key: 'blocked', header: 'Violations', numeric: true, width: '6rem', render: (row) => <a href={`#/audit?team=${encodeURIComponent(row.team)}&decision=violation`}>{count(row.violations)}</a> },
     { key: 'ci', header: 'First-try CI pass', numeric: true, width: '7.5rem', render: (row) => percent(row.first_try_pass_rate_pct) },
   ];
   return (

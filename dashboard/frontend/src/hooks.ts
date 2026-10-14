@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { filterParams, useFilters, useLive } from './context';
-import { RATE_KEY, readNumber, writeNumber } from './format';
 
 /** Load data; reloads when dependencies change. A reload keeps the previous data on screen. */
 export function useApi<T>(loader: () => Promise<T>, dependencies: unknown[] = []) {
@@ -33,9 +32,7 @@ export function useSummary<T>(load: (params: URLSearchParams) => Promise<T>) {
   return useApi(() => load(filterParams(filters)), [filters, version]);
 }
 
-/** USD per Bobcoin: a value saved in this browser wins, else the server rate. */
+/** USD per Bobcoin comes only from the server (BOBCOIN_USD_RATE), so every viewer sees the same figures. */
 export function useUsdRate(serverRate: number | null | undefined) {
-  const [saved, setSaved] = useState<number | null>(() => readNumber(RATE_KEY, null));
-  const update = useCallback((value: number | null) => { setSaved(value); writeNumber(RATE_KEY, value); }, []);
-  return { rate: saved ?? serverRate ?? null, saved, fromBrowser: saved != null, setRate: update };
+  return { rate: serverRate ?? null, fromBrowser: false };
 }

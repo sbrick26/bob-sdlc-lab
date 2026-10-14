@@ -39,6 +39,10 @@ This folder is the Bob SDLC lab dashboard. It is the Bob Governance service
   `/api/v1/stream` is a Server-Sent Events feed of ingested events that the
   console uses for live updates. The policy draft and publish API stays, but
   the console no longer links it.
+- **Violations**: a violation is any rule hit, blocked or flagged. The
+  violation rate is violations per 100 actions (prompts and tool calls).
+  Charts and tables link to the Audit log or the Violations table with the
+  matching filters (`#/audit?tool=...&outcome=failed`, `#/violations?rule=...`).
 - **Masking at ingest**: prompts, tool input and output and Bob's answers are
   redacted (credential formats, labelled secrets) and then long token-like
   strings and US phone numbers (except in files under `data/` and `tests/`)

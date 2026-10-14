@@ -1,4 +1,4 @@
-import { ChartLine, Dashboard, DeliveryParcel, DocumentView, Money, Renew, WarningAlt } from '@carbon/icons-react';
+import { ChartLine, Dashboard, DeliveryParcel, DocumentView, Money, Renew, Settings, WarningAlt } from '@carbon/icons-react';
 import { useLive } from '../context';
 import { Header, HeaderGlobalAction, HeaderGlobalBar, HeaderName } from '@carbon/react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
@@ -48,7 +48,7 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
-        <div className="side-rail__status"><span className="status-dot" /><div><strong>Controls active</strong><span>Hooks reporting</span></div></div>
+        <NavLink to="/settings" className={({ isActive }) => `side-link side-link--bottom${isActive ? ' side-link--active' : ''}`}><Settings size={18} /><span>Settings</span></NavLink>
       </aside>
       <main className="main-content" id="main-content"><Outlet /></main>
     </div>

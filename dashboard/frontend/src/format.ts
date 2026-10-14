@@ -133,7 +133,6 @@ export function writeNumber(key: string, value: number | null, store: StorageLik
 }
 
 export const BASELINE_KEY = 'governance.baselineHoursPerTicket';
-export const RATE_KEY = 'governance.usdPerBobcoin';
 
 /** Seconds as "4.5 s", "8.5 min" or "1.2 h". */
 export function seconds(value: Num): string {
@@ -202,7 +201,7 @@ export const toolWords = (tool: string | null | undefined) => (tool ? TOOL_WORDS
 
 const CHIP_LABELS: Record<string, string> = {
   user: 'User', ticket: 'Ticket', event: 'Event type', decision: 'Decision', session: 'Session', tool: 'Tool',
-  outcome: 'Outcome', rule: 'Rule', team: 'Team',
+  outcome: 'Outcome', rule: 'Rule', team: 'Team', since: 'From', until: 'To',
 };
 
 /** Removable chips for the drill-down filters in a page URL ("Tool: Run command ×"). */
@@ -212,7 +211,7 @@ export function filterChips(params: URLSearchParams): Array<{ key: string; label
     const value = params.get(key);
     if (!value) continue;
     const shown = key === 'tool' ? toolWords(value) : key === 'event' ? eventWords(value)
-      : key === 'decision' ? DECISION_WORDS[value] ?? value : key === 'session' ? value.slice(0, 8) : value;
+      : key === 'decision' ? (value === 'violation' ? 'Violations' : DECISION_WORDS[value] ?? value) : key === 'session' ? value.slice(0, 8) : value;
     chips.push({ key, label: `${CHIP_LABELS[key]}: ${shown}` });
   }
   return chips;

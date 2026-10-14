@@ -451,3 +451,13 @@ button, input, select { font: inherit; }
 .stat-card--link:hover .stat-card { border-color: var(--blue); }
 .number-table tr.row--link { cursor: pointer; }
 .number-table tr.row--link:hover td { background: var(--hover); }
+.side-link--bottom { margin-top: auto; border-top: 1px solid #393939; }
+.side-rail { display: flex; flex-direction: column; }
+.settings-panel { margin-top: 1.5rem; padding: 1.5rem; }
+.settings-panel p { margin: 0; }
+.filter-panel--audit { grid-template-columns: repeat(6, minmax(7rem, 1fr)); }
+@media (max-width: 1100px) { .filter-panel--audit { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.settings-panel .settings-line { margin-top: .75rem; color: var(--muted); font-size: .875rem; }
+.settings-panel--restricted { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3rem 1.5rem; text-align: center; color: var(--muted); }
+.settings-panel--restricted h2 { margin: .5rem 0 0; color: var(--ink); font-size: 1.25rem; font-weight: 400; }
+.chart-body path.bar { cursor: pointer; }

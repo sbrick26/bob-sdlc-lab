@@ -1,7 +1,7 @@
 import { StackedBarChart } from '@carbon/charts-react';
 import { Renew } from '@carbon/icons-react';
-import { Button, Tag, TextInput } from '@carbon/react';
-import { useMemo, useState } from 'react';
+import { Button, Tag } from '@carbon/react';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { BudgetCell, BudgetTile } from '../components/Budget';
@@ -13,7 +13,7 @@ import { PageHeader } from '../components/PageHeader';
 import { EmptyState, PageError, PageLoading } from '../components/States';
 import { KpiTile } from '../components/StatCard';
 import { TeamTable } from '../components/TeamTable';
-import { bobcoins, bucketLabel, count, percent } from '../format';
+import { bobcoins, bucketLabel, count, drillHref, percent } from '../format';
 import { useSummary, useUsdRate } from '../hooks';
 import { baseOptions, teamColors, tip, useDarkMode, type TipSpec } from '../theme';
 import type { BudgetEntry, CostSummary } from '../types';
@@ -29,8 +29,7 @@ export function UsagePage() {
   const [params] = useSearchParams();
   const userFilter = params.get('user') ?? '';
   const state = useSummary(api.cost);
-  const { rate, saved, fromBrowser, setRate } = useUsdRate(state.data?.usd_rate);
-  const [rateText, setRateText] = useState(saved == null ? '' : String(saved));
+  const { rate, fromBrowser } = useUsdRate(state.data?.usd_rate);
   const data = state.data;
 
   const charts = useMemo(() => {
@@ -53,12 +52,7 @@ export function UsagePage() {
   if (!data || !charts) return <PageError error={state.error || new Error('No usage data returned')} retry={state.reload} />;
   const days = data.period_days;
   const eq = data.equation;
-  const onRate = (text: string) => {
-    setRateText(text);
-    const value = Number(text);
-    if (text.trim() === '') setRate(null);
-    else if (Number.isFinite(value) && value > 0) setRate(value);
-  };
+
   const users: UserRow[] = [
     ...data.people.filter((row) => !userFilter || row.user === userFilter),
     ...(data.automation && !userFilter ? [{ ...data.automation, user: data.automation.label, team: '—', budget_pct: null, automation: true }] : []),
@@ -107,7 +101,6 @@ export function UsagePage() {
     <>
       <PageHeader title="Usage" actions={
         <>
-          <TextInput id="usd-rate" size="sm" type="number" min={0} step={0.01} labelText="USD per Bobcoin" placeholder={data.usd_rate == null ? 'Set rate' : String(data.usd_rate)} value={rateText} onChange={(event) => onRate(event.currentTarget.value)} className="rate-input" />
           <Button kind="ghost" size="sm" renderIcon={Renew} hasIconOnly iconDescription="Refresh" onClick={state.reload} />
         </>
       } />
@@ -147,7 +140,7 @@ export function UsagePage() {
       <TeamTable rows={data.by_team} rate={rate} />
       <section className="panel table-panel" id="users">
         <div className="panel__header"><h2>{userFilter ? `Spend for ${userFilter}` : 'Spend per user'}</h2>{userFilter && <a className="chart-panel__link" href="#/usage">Show all users</a>}</div>
-        {users.length ? <NumberTable label="Users" columns={userColumns} rows={users} rowKey={(row) => row.user} rowClass={(row) => (row.automation ? 'row--automation' : undefined)} /> : <EmptyState title="No usage in this period" detail="Rows appear after Bob sends usage on Stop events." />}
+        {users.length ? <NumberTable label="Users" columns={userColumns} rows={users} rowKey={(row) => row.user} rowClass={(row) => (row.automation ? 'row--automation' : undefined)} rowHref={(row) => (row.automation ? undefined : drillHref('audit', { user: row.user }))} /> : <EmptyState title="No usage in this period" detail="Rows appear after Bob sends usage on Stop events." />}
       </section>
       <section className="panel table-panel">
         <div className="panel__header panel__header--stacked"><h2>Outlier sessions</h2><p className="panel__subtitle">Over {count(t.tokens)} context tokens, over {t.turns} turns, or over {t.bobcoins} BC in one session.</p></div>

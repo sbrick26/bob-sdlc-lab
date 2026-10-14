@@ -10,19 +10,20 @@ import { PageHeader } from '../components/PageHeader';
 import { EmptyState, PageError, PageLoading } from '../components/States';
 import { useEventDrawer } from '../components/useEventDrawer';
 import { filterParams, useFilters, useLive, useNewIds } from '../context';
-import { bobcoins, count, eventWords, minutes, shortTime } from '../format';
+import { bobcoins, count, eventWords, minutes, shortTime, toolWords } from '../format';
+import { FilterChips } from '../components/FilterChips';
 import { useApi, useUsdRate } from '../hooks';
 import { baseOptions, simpleTip, slot, useDarkMode } from '../theme';
 import type { SessionSummary } from '../types';
 
-const LOCAL_KEYS = ['user', 'ticket', 'event', 'decision', 'session'] as const;
+const LOCAL_KEYS = ['user', 'ticket', 'event', 'decision', 'session', 'tool', 'outcome', 'rule'] as const;
 type Local = Record<(typeof LOCAL_KEYS)[number], string>;
 
 export function AuditLogPage() {
   const { filters: global, setTeam } = useFilters();
   const { version } = useLive();
   const [params, setParams] = useSearchParams();
-  const local: Local = { user: params.get('user') ?? '', ticket: params.get('ticket') ?? '', event: params.get('event') ?? '', decision: params.get('decision') ?? '', session: params.get('session') ?? '' };
+  const local = Object.fromEntries(LOCAL_KEYS.map((key) => [key, params.get(key) ?? ''])) as Local;
   const teamParam = params.get('team');
   useEffect(() => { if (teamParam != null && teamParam !== global.team) setTeam(teamParam); }, [teamParam]); // eslint-disable-line react-hooks/exhaustive-deps
   const [page, setPage] = useState(1);
@@ -31,7 +32,9 @@ export function AuditLogPage() {
   const session = local.session;
   const query = useMemo(() => {
     const result = session ? new URLSearchParams() : filterParams(global);
-    if (session) result.set('tz_offset', String(new Date().getTimezoneOffset()));
+    result.set('tz_offset', String(new Date().getTimezoneOffset()));
+    // A drill-down to one day carries its own since/until.
+    if (params.get('since')) { result.set('since', params.get('since')!); result.set('until', params.get('until') ?? params.get('since')!); }
     Object.entries(local).forEach(([key, value]) => value && result.set(key, value));
     return result;
   }, [global, params]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -68,8 +71,11 @@ export function AuditLogPage() {
         <FacetSelect id="filter-user" label="User" value={local.user} values={facets.users} onChange={(value) => update('user', value)} />
         <FacetSelect id="filter-ticket" label="Ticket" value={local.ticket} values={facets.tickets ?? []} onChange={(value) => update('ticket', value)} />
         <FacetSelect id="filter-event" label="Event type" value={local.event} values={facets.events} words={eventWords} onChange={(value) => update('event', value)} />
-        <FacetSelect id="filter-decision" label="Decision" value={local.decision} values={facets.decisions} words={(value) => ({ allowed: 'Allowed', blocked: 'Blocked', observed: 'Flagged' }[value] ?? value)} onChange={(value) => update('decision', value)} />
+        <FacetSelect id="filter-decision" label="Decision" value={local.decision} values={['violation', ...facets.decisions]} words={(value) => ({ violation: 'Violations (blocked or flagged)', allowed: 'Allowed', blocked: 'Blocked', observed: 'Flagged' }[value] ?? value)} onChange={(value) => update('decision', value)} />
+        <FacetSelect id="filter-tool" label="Tool" value={local.tool} values={facets.tools ?? []} words={toolWords} onChange={(value) => update('tool', value)} />
+        <FacetSelect id="filter-outcome" label="Tool outcome" value={local.outcome} values={['completed', 'failed', 'blocked']} words={(value) => value[0].toUpperCase() + value.slice(1)} onChange={(value) => update('outcome', value)} />
       </section>
+      <FilterChips />
       {session && <SessionHeader summary={summary} sessionId={session} onClear={() => update('session', '')} />}
       <section className="panel table-panel">
         <div className="panel__header"><h2>{session ? `Session timeline (${count(events.length)})` : `Events (${count(events.length)})`}</h2></div>
@@ -94,7 +100,7 @@ function SessionHeader({ summary, sessionId, onClear }: { summary: SessionSummar
     ['User', summary.user ?? '—'], ['Team', summary.team ?? '—'], ['Ticket', summary.ticket ?? '—'],
     ['Started', shortTime(summary.started_at)], ['Ended', shortTime(summary.ended_at)], ['Duration', minutes(summary.duration_minutes)],
     ['Turns', count(summary.turns)], ['Bobcoins', `${bobcoins(summary.bobcoins)}${summary.bobcoins != null && rate != null ? ` (${usdText(summary.bobcoins, rate)})` : ''}`],
-    ['Context tokens', count(summary.tokens)], ['Blocks', count(summary.blocks)],
+    ['Context tokens', count(summary.tokens)], ['Violations', count(summary.violations)],
   ];
   return (
     <section className="panel table-panel session-panel">
