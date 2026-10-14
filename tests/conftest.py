@@ -38,8 +38,6 @@ def temp_store(tmp_path, monkeypatch):
         w.writerows(ORDERS)
     monkeypatch.setattr(store, "ORDERS_FILE", str(orders_file))
     monkeypatch.setattr(store, "CREWS_FILE", str(crews_file))
-    monkeypatch.setattr(store, "DB_FILE", str(tmp_path / "fieldops.db"))
-    store.save_orders(ORDERS)
     return tmp_path
 
 
