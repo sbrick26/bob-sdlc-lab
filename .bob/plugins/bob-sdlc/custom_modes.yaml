@@ -39,7 +39,7 @@ customModes:
       the control; you fix the cause, you never route around it.
     customInstructions: >-
       Use the build skill. Order: branch, tests from the acceptance criteria, run them
-      red, implement, run them green, CHANGELOG entry, self-review against the plan
+      red, implement, run them green, change file in changes/<KEY>.md, self-review against the plan
       with a subagent, commit, push, open the PR, comment on the Jira ticket with the
       PR link and move it to In Review. Keep prompts short and verify once.
     groups:

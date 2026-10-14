@@ -13,7 +13,7 @@ You are the guide. You own KAN-161, you approve every PR, and you reset the lab 
 | 5 | Main is protected | `tools/ci/protect-main.sh`, then `tools/ci/protect-main.sh --show`. Required: tests, protected-paths, bob-review, one approving review. |
 | 6 | Cards printed | [cards.md](cards.md). Fill the Jira password, dashboard URL and token by hand. Never commit them. |
 | 7 | Your own `lab.env` | `./start.sh` on your laptop. Run the lab once end to end. |
-| 8 | Participants can push | Each participant needs write access to the repo and `gh` signed in, because the build opens the PR with `gh pr create`. |
+| 8 | Participants can push | The shared lab account `ibm-demo-dev` has write access, and its classic token (repo scope, short expiry) is on every card. `start.sh` stores it in `lab.env` and sets this clone's git to push with it. Participants need the `gh` CLI installed but never sign in. You approve every PR as yourself. |
 
 ## Opening (3 minutes)
 

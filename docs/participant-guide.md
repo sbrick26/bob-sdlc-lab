@@ -69,9 +69,9 @@ Bob never picks a ticket assigned to someone else.
    2. Write the tests from the acceptance criteria. Run them. They fail first.
    3. Change only the Work units files.
    4. Run `python -m pytest -q` until green.
-   5. Add a `CHANGELOG.md` entry with the ticket key.
+   5. Write `changes/<KEY>.md`: the key and what changed, then why.
    6. Ask a subagent to compare the diff with the plan. Fix real gaps.
-   7. Commit, push, open the PR with `gh pr create`.
+   7. Commit, push, open the PR with `./scripts/lab-gh pr create`, labelled with your name. It uses the lab GitHub account, so you never sign in to GitHub.
    8. Comment the PR link on the Jira ticket. Move it to In Review.
 2. See two blocks. Before Bob starts building, send these two prompts, one at a time:
 
@@ -98,7 +98,7 @@ Bob never picks a ticket assigned to someone else.
 
 ## 40 to 50 min: PR and review
 
-1. Before every `git push` and `gh pr create`, the PR gate checks `governance/pr-checklist.yaml`:
+1. Before every `git push` and PR creation, the PR gate checks `governance/pr-checklist.yaml`:
 
    | Check | Plain words |
    |---|---|
@@ -106,7 +106,7 @@ Bob never picks a ticket assigned to someone else.
    | plan-exists | A spec exists at plans/{KEY}.md. |
    | plan-approved | The requester approved the spec. |
    | tests-passed | The tests passed in this session. |
-   | changelog | CHANGELOG.md has an entry for {KEY}. |
+   | changelog | changes/{KEY}.md exists and names {KEY}. |
    | no-shortcuts | No --no-verify and no --force. |
 
    If one fails, the push is refused with one sentence, for example `PR gate: not yet. The tests passed in this session. (tests-passed)`. Bob fixes that item and tries again.

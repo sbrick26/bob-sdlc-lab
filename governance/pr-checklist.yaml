@@ -19,9 +19,9 @@ checks:
     type: marker
     value: .bob/run/tests-passed
   - id: changelog
-    says: "CHANGELOG.md has an entry for {KEY}."
+    says: "changes/{KEY}.md exists and names {KEY}."
     type: file_contains
-    path: CHANGELOG.md
+    path: changes/{KEY}.md
     value: "{KEY}"
   - id: no-shortcuts
     says: "No --no-verify and no --force."

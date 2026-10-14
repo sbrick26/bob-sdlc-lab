@@ -12,12 +12,12 @@ does_not_touch:
 
 ## What I need
 
-Our dispatch lead wants to know, for every change, which site it touches before it ships. Add a line "Site:" to the PR template and make the PR gate refuse a push when the CHANGELOG entry for the ticket has no "Site:" line.
+Our dispatch lead wants to know, for every change, which site it touches before it ships. Add a line "Site:" to the PR template and make the PR gate refuse a push when changes/<KEY>.md has no "Site:" line.
 
 ## Done when
 
 - The PR template has a "Site:" line under Ticket.
-- The PR checklist has a new item that checks CHANGELOG.md contains "Site:" for the ticket.
+- The PR checklist has a new item that checks changes/{KEY}.md contains "Site:".
 - A push without it is refused with a plain sentence saying what is missing.
 - A push with it goes through.
 

@@ -254,7 +254,7 @@ class Lane:
             sh(["git", "worktree", "add", self.dir, "-B", self.branch, "origin/main"], check=True)
         with open(os.path.join(self.dir, "lab.env"), "w") as f:
             f.write(f"LAB_USER={self.name}\nLAB_ROLE=participant\nLAB_TICKET={self.key}\n"
-                    f"DASHBOARD_URL={DASH}\nDASHBOARD_TOKEN={INGEST}\nLAB_CHANNEL=acp\n")
+                    f"DASHBOARD_URL={DASH}\nDASHBOARD_TOKEN={INGEST}\nLAB_CHANNEL=acp\nLAB_GH_TOKEN={_DE.get('LAB_GH_TOKEN', '')}\n")
         plugin = json.load(open(os.path.join(REPO, ".bob", "plugins", "bob-sdlc", "mcp.json")))
         entry = dict(plugin["mcpServers"]["atlassian-token"]); entry["disabled"] = False
         with open(os.path.join(self.dir, ".bob", "mcp.json"), "w") as f:
@@ -269,6 +269,12 @@ class Lane:
         env = gh_env()
         env.update({"JIRA_URL": f"https://{JE['JIRA_HOST']}", "JIRA_USERNAME": JE["JIRA_EMAIL"],
                     "JIRA_API_TOKEN": JE["JIRA_API_TOKEN"]})  # env only, never argv
+        bot = _DE.get("LAB_GH_TOKEN", "")
+        if bot:  # push as the shared lab account; env-scoped git config resets other credential helpers
+            env.update({"GIT_CONFIG_COUNT": "2", "GIT_CONFIG_KEY_0": "credential.helper", "GIT_CONFIG_VALUE_0": "",
+                        "GIT_CONFIG_KEY_1": "credential.helper",
+                        "GIT_CONFIG_VALUE_1": '!f() { echo username=x-access-token; echo "password=$LAB_GH_TOKEN"; }; f',
+                        "LAB_GH_TOKEN": bot})
         return env
 
     def env_args(self):
@@ -465,7 +471,7 @@ class Lane:
             tests_changed = [f for f in sh(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=d).stdout.split() if f.startswith("tests/")]
             py = sh([".venv/bin/python", "-m", "pytest", "-q"], cwd=d, timeout=300)
             tail = (py.stdout.strip().splitlines() or [""])[-1]
-            changelog = K in open(os.path.join(d, "CHANGELOG.md")).read()
+            cf = os.path.join(d, "changes", f"{K}.md"); changelog = os.path.exists(cf) and K in open(cf).read()
             commits = int(sh(["git", "rev-list", "--count", "origin/main..HEAD"], cwd=d).stdout.strip() or 0)
             pushed = bool(sh(["git", "ls-remote", "origin", f"refs/heads/{self.branch}"], cwd=d, timeout=60).stdout.strip())
             pr = pr_for(self.branch)
@@ -488,11 +494,11 @@ class Lane:
             if not s.get("tests_changed"):
                 parts.append("No test file under tests/ changed on the branch. Write the tests the plan names.")
             if not s.get("changelog"):
-                parts.append(f"CHANGELOG.md has no entry for {K}. Add it.")
+                parts.append(f"changes/{K}.md is missing. Write it: the key and what changed, then why.")
             if not s.get("commits"):
                 parts.append("Nothing is committed on the branch. Commit with the key first.")
             if not s.get("pushed") or not s.get("pr"):
-                parts.append(f"The PR is not open yet. Push the branch and open the PR with gh pr create --base main --title \"{K}: {self.title}\".")
+                parts.append(f"The PR is not open yet. Push the branch and open the PR with ./scripts/lab-gh pr create --base main --label {N} --title \"{K}: {self.title}\".")
             if s.get("jira") != "In Review" or not s.get("jira_pr_link"):
                 parts.append(f"Jira {K} is {s.get('jira')} and pr-link-in-comment={s.get('jira_pr_link')}: add a comment with the PR link and move it to In Review.")
             return " ".join(parts) or "Finish the build skill steps."

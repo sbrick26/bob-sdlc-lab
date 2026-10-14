@@ -1,3 +1,5 @@
+Opened by NAME Lab for KAN-000.
+
 ## Ticket
 KAN-000: title
 
@@ -13,5 +15,5 @@ plans/KAN-000.md, approved by: name
 
 ## Checklist
 - [ ] only Work units files changed
-- [ ] CHANGELOG entry
+- [ ] changes/KAN-000.md written
 - [ ] no personal data in output or logs

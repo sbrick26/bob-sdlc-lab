@@ -11,6 +11,7 @@ Print this page. Cut along the lines. Fill the password, dashboard URL and token
 - Ticket: KAN-157, tests for the crew assignment service
 - Dashboard URL: ____________________
 - Dashboard token: ____________________
+- GitHub lab token: ____________________
 1. `git clone https://github.com/sbrick26/bob-sdlc-lab.git`
 2. `cd bob-sdlc-lab && ./start.sh`
 3. In Bob IDE: `check my tickets`
@@ -24,6 +25,7 @@ Print this page. Cut along the lines. Fill the password, dashboard URL and token
 - Ticket: KAN-158, move work orders from CSV to SQLite
 - Dashboard URL: ____________________
 - Dashboard token: ____________________
+- GitHub lab token: ____________________
 1. `git clone https://github.com/sbrick26/bob-sdlc-lab.git`
 2. `cd bob-sdlc-lab && ./start.sh`
 3. In Bob IDE: `check my tickets`
@@ -37,6 +39,7 @@ Print this page. Cut along the lines. Fill the password, dashboard URL and token
 - Ticket: KAN-159, run work orders in plain words
 - Dashboard URL: ____________________
 - Dashboard token: ____________________
+- GitHub lab token: ____________________
 1. `git clone https://github.com/sbrick26/bob-sdlc-lab.git`
 2. `cd bob-sdlc-lab && ./start.sh`
 3. In Bob IDE: `check my tickets`
@@ -50,6 +53,7 @@ Print this page. Cut along the lines. Fill the password, dashboard URL and token
 - Ticket: KAN-160, mask phone numbers, keep an audit trail
 - Dashboard URL: ____________________
 - Dashboard token: ____________________
+- GitHub lab token: ____________________
 1. `git clone https://github.com/sbrick26/bob-sdlc-lab.git`
 2. `cd bob-sdlc-lab && ./start.sh`
 3. In Bob IDE: `check my tickets`
@@ -63,6 +67,7 @@ Print this page. Cut along the lines. Fill the password, dashboard URL and token
 - Ticket: ____________________
 - Dashboard URL: ____________________
 - Dashboard token: ____________________
+- GitHub lab token: ____________________
 1. `git clone https://github.com/sbrick26/bob-sdlc-lab.git`
 2. `cd bob-sdlc-lab && ./start.sh`
 3. In Bob IDE: `check my tickets`
