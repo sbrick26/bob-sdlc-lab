@@ -33,11 +33,11 @@ flowchart LR
 | Stage | Bob feature | File in the repo | Control that enforces it |
 |---|---|---|---|
 | Pick work | skill `/tickets` ("check my tickets") | `.bob/plugins/bob-sdlc/skills/tickets/SKILL.md`, `mcp.json` | Jira permissions: the MCP server acts as the signed-in user |
-| Plan | mode `SDLC Plan`, skill `/plan <KEY>` | `custom_modes.yaml` (`sdlc-plan`), `rules-sdlc-plan/plan-format.md` | Mode tool groups: edit only `plans/*.md`, no command tool |
-| Approve | requester reply in chat | `plans/<KEY>.md` (`Requester approval: approved`) | PR gate item `plan-approved` |
+| Plan | mode `SDLC Plan`, skill `/plan <KEY>` | `custom_modes.yaml` (`sdlc-plan`), `rules-sdlc-plan/plan-format.md` | Mode tool groups: edit only `fieldops-repo/plans/*.md`, no command tool |
+| Approve | requester reply in chat | `fieldops-repo/plans/<KEY>.md` (`Requester approval: approved`) | PR gate item `plan-approved` |
 | Build | mode `SDLC Build`, skill `/build <KEY>` | `custom_modes.yaml` (`sdlc-build`), `rules-sdlc-build/build-order.md`, `rules/*.md` | Rules in context; `gov.py` asks the dashboard on every prompt and tool call (package, secret, PII and git rules) |
-| Test | pytest, marker hook | `.bob/hooks/test_marker.py` | PR gate item `tests-passed`; CI job `tests` |
-| Push and PR | `gh pr create`, PR template | `.bob/hooks/pr_gate.py`, `governance/pr-checklist.yaml`, `.github/pull_request_template.md` | PR gate refuses the push in one sentence |
+| Test | pytest in `fieldops-repo/`, marker hook | `.bob/hooks/test_marker.py` (marker in `<git dir>/bob-run/`) | PR gate item `tests-passed`; CI job `tests` |
+| Push and PR | `gh pr create`, PR template | `.bob/hooks/pr_gate.py`, `.bob/governance/pr-checklist.yaml`, `.github/pull_request_template.md` | PR gate refuses the push in one sentence |
 | Review | mode `SDLC Review`, skill `/review`, headless `bob run` | `.github/workflows/sdlc-gate.yml`, `skills/review/SKILL.md`, `rules-sdlc-review/review-output.md` | CI job `bob-review`, rules pinned to main, fails closed without a verdict |
 | Protect the platform | rule `05-protected-paths.md` | `.github/scripts/protected_paths.py`, `.github/CODEOWNERS` | CI job `protected-paths` |
 | Merge | GitHub merge | GitHub branch protection | Branch protection: tests, protected-paths, bob-review green, one approving review |

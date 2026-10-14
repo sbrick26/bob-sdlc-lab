@@ -17,6 +17,6 @@ Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-build mode; switch 
    - the review verdict comment (it starts with "SDLC gate: review") and its blocking findings: `./.bob/scripts/lab-gh pr view <number> --comments`;
    - reviewer change requests on the PR.
 3. List the findings to the user in a short table (finding, file, what you will change). Fix the blocking ones first.
-4. Check out the branch `<user>/<KEY>`, make the smallest changes that address each finding, stay inside the plan's Work units, run the tests until green.
+4. Check out the branch `<user>/<KEY>`, make the smallest changes that address each finding, stay inside the plan's Work units, run the tests (`cd fieldops-repo && .venv/bin/python -m pytest -q`) until green.
 5. Commit "<KEY>: address review findings", push. CI runs again on its own.
 6. Comment on the PR which findings you fixed. Say CI is reviewing again, switch back to the sdlc mode (SDLC Agent) and say so, and end with the "Your links" block.

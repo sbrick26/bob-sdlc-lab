@@ -4,16 +4,16 @@ Opened by NAME Lab for KAN-000.
 KAN-000: title
 
 ## Spec
-plans/KAN-000.md, approved by: name
+fieldops-repo/plans/KAN-000.md, approved by: name
 
 ## What changed
 - one line per file
 
 ## Proof
-- tests: `python -m pytest -q` result
+- tests: `cd fieldops-repo && .venv/bin/python -m pytest -q` result
 - self-review: criteria met n/n
 
 ## Checklist
 - [ ] only Work units files changed
-- [ ] changes/KAN-000.md written
+- [ ] fieldops-repo/changes/KAN-000.md written
 - [ ] no personal data in output or logs

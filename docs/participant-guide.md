@@ -17,13 +17,14 @@ You need: Bob IDE 2.2.2 or newer (signed in), git, python3, a modern browser, an
 
    ```sh
    git clone https://github.com/sbrick26/bob-sdlc-lab.git
-   cd bob-sdlc-lab && ./setup.sh      # Windows: powershell -ExecutionPolicy Bypass -File .\setup.ps1
+   cd bob-sdlc-lab && ./lab-setup/mac-setup.sh      # macOS and Linux
+   # Windows: cd bob-sdlc-lab; powershell -ExecutionPolicy Bypass -File .\lab-setup\windows-setup.ps1
    ```
 
 2. The setup script checks and installs what is missing, shows a numbered list of lab profiles and asks for your number, then the two tokens on your card. Run it again at any time to change a value; press Enter to keep the current one.
 3. It asks for the `Dashboard token from your card:` and then the `Dashboard URL from your card:`. Type both from the card.
-4. It writes `lab.env`, sets your git name and email for this repo, and installs the Python packages. It ends with: `Ready, <name>. Open this folder in Bob IDE, then say: check my tickets`.
-5. On a Mac, Bob IDE opens the folder for you. If not, open the `bob-sdlc-lab` folder in Bob IDE yourself.
+4. It writes `lab.env` and `my-lab.txt` at the repo root, sets your git name and email for this repo, and installs the Python packages in `fieldops-repo/.venv`. It ends with: `Ready, <name>. Open this folder in Bob IDE, then say: check my tickets`.
+5. On a Mac, Bob IDE opens the folder for you. If not, open the `bob-sdlc-lab` folder (the repo root, not `fieldops-repo/`) in Bob IDE yourself. The app, its tests and your ticket files live in `fieldops-repo/`.
 6. Open the mode list in the chat panel. The lab modes are at the end: `SDLC Plan`, `SDLC Build`, `SDLC Review`.
 7. Sign in to Jira. The first time Bob uses Jira, Bob IDE opens a browser for the Atlassian sign-in. Use the Jira login and password on your card. If no browser opens, go to Bob Settings > MCP and click Authenticate on the `atlassian` server.
 
@@ -38,8 +39,8 @@ Bob never picks a ticket assigned to someone else.
 
 ## 12 to 25 min: plan and approve
 
-1. Type `/plan <KEY>`, for example `/plan KAN-157`. Bob switches to `SDLC Plan`. In this mode Bob can write only markdown under `plans/` and has no command tool.
-2. Bob reads the ticket and the files it names, then writes `plans/<KEY>.md` with these headings:
+1. Type `/plan <KEY>`, for example `/plan KAN-157`. Bob switches to `SDLC Plan`. In this mode Bob can write only markdown under `fieldops-repo/plans/` and has no command tool.
+2. Bob reads the ticket and the files it names, then writes `fieldops-repo/plans/<KEY>.md` with these headings:
 
    | Heading | What it says |
    |---|---|
@@ -63,10 +64,10 @@ Bob never picks a ticket assigned to someone else.
 
 1. Type `/build <KEY>`. Bob switches to `SDLC Build` and follows a fixed order:
    1. Create the branch `<lab id>/<KEY>`, for example `sam/KAN-157`.
-   2. Write the tests from the acceptance criteria. Run them. They fail first.
+   2. Write the tests from the acceptance criteria in `fieldops-repo/tests/`. Run them. They fail first.
    3. Change only the Work units files.
-   4. Run `python -m pytest -q` until green.
-   5. Write `changes/<KEY>.md`: the key and what changed, then why.
+   4. Run `cd fieldops-repo && .venv/bin/python -m pytest -q` until green.
+   5. Write `fieldops-repo/changes/<KEY>.md`: the key and what changed, then why.
    6. Ask a subagent to compare the diff with the plan. Fix real gaps.
    7. Commit, push, open the PR with `./.bob/scripts/lab-gh pr create`, labelled with your name. It uses the lab GitHub account, so you never sign in to GitHub.
    8. Comment the PR link on the Jira ticket. Move it to In Review.
@@ -95,15 +96,15 @@ Bob never picks a ticket assigned to someone else.
 
 ## 40 to 50 min: PR and review
 
-1. Before every `git push` and PR creation, the PR gate checks `governance/pr-checklist.yaml`:
+1. Before every `git push` and PR creation, the PR gate checks `.bob/governance/pr-checklist.yaml`:
 
    | Check | Plain words |
    |---|---|
    | branch-not-main | You are on a ticket branch, not main. |
-   | plan-exists | A spec exists at plans/{KEY}.md. |
+   | plan-exists | A spec exists at fieldops-repo/plans/{KEY}.md. |
    | plan-approved | The requester approved the spec. |
    | tests-passed | The tests passed in this session. |
-   | changelog | changes/{KEY}.md exists and names {KEY}. |
+   | changelog | fieldops-repo/changes/{KEY}.md exists and names {KEY}. |
    | no-shortcuts | No --no-verify and no --force. |
 
    If one fails, the push is refused with one sentence, for example `PR gate: not yet. The tests passed in this session. (tests-passed)`. Bob fixes that item and tries again.
@@ -111,8 +112,8 @@ Bob never picks a ticket assigned to someone else.
 
    | Job | What it does |
    |---|---|
-   | tests | runs `python -m pytest -q` |
-   | protected-paths | fails if the PR touches `.bob/`, `.github/`, `governance/` or `tools/` |
+   | tests | runs `python -m pytest -q` in `fieldops-repo/` |
+   | protected-paths | fails if the PR touches `.bob/` (including `.bob/governance/`) or `.github/` |
    | bob-review | Bob in `SDLC Review` mode judges the diff against your plan, with the rules taken from main |
 
 3. bob-review posts one PR comment with a verdict block: `VERDICT`, `CRITERIA`, `FINDINGS`, `RULES`, `TESTS`. No verdict means fail.

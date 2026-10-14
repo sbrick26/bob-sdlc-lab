@@ -1,3 +1,0 @@
-{"type": "init", "session": "x"}
-{"type": "message", "content": [{"type": "text", "text": "Reviewing."}]}
-{"type": "message", "content": [{"type": "text", "text": "VERDICT: FAIL\nCRITERIA: 1/2\nFINDINGS:\n- [blocking] fieldops/app.py:88 Phone number is printed to the log.\n- [blocking] CHANGELOG.md:1 No entry for LAB-4.\n- [advisory] tests/test_mask.py:5 Add a case for an empty string.\nRULES: 03-personal-data.md\nTESTS: 4/5\n"}]}

@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [setup.sh, setup.ps1, requirements.txt, .bob/hooks/**, .github/workflows/setup-check.yml]
+    paths: [lab-setup/**, fieldops-repo/requirements.txt, .bob/hooks/**, .github/workflows/setup-check.yml]
 permissions:
   contents: read
 jobs:
@@ -26,10 +26,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
-      - name: Run setup.ps1 (non-interactive)
+      - name: Run lab-setup/windows-setup.ps1 (non-interactive)
         run: |
-          if ('${{ matrix.shell }}' -eq 'powershell') { powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 } else { pwsh -NoProfile -File .\setup.ps1 }
-          if ($LASTEXITCODE -ne 0) { throw "setup.ps1 exited $LASTEXITCODE" }
+          if ('${{ matrix.shell }}' -eq 'powershell') { powershell -NoProfile -ExecutionPolicy Bypass -File .\lab-setup\windows-setup.ps1 } else { pwsh -NoProfile -File .\lab-setup\windows-setup.ps1 }
+          if ($LASTEXITCODE -ne 0) { throw "windows-setup.ps1 exited $LASTEXITCODE" }
       - name: Check lab.env and git identity
         run: |
           Get-Content lab.env
@@ -61,6 +61,7 @@ jobs:
           if (-not ($out -match 'password=setup-check-dummy')) { throw 'credential helper did not return the lab token' }
       - name: Run the app tests in the lab venv
         run: |
+          Set-Location fieldops-repo
           .\.venv\Scripts\python.exe -m pytest -q
           if ($LASTEXITCODE -notin 0,5) { throw "pytest exit $LASTEXITCODE" }
   unix:
@@ -75,8 +76,8 @@ jobs:
       LAB_GH_TOKEN: setup-check-dummy
     steps:
       - uses: actions/checkout@v4
-      - name: Run setup.sh (non-interactive)
-        run: sh setup.sh </dev/null
+      - name: Run lab-setup/mac-setup.sh (non-interactive)
+        run: sh lab-setup/mac-setup.sh </dev/null
       - name: Check lab.env, git identity, credentials, hooks, tests
         run: |
           grep -qx 'LAB_USER=alex' lab.env
@@ -85,4 +86,6 @@ jobs:
           echo '{"hook_event_name":"SessionStart","source":"startup","session_id":"setup-check","cwd":"."}' | python3 .bob/hooks/gov.py
           set +e; echo '{"hook_event_name":"PreToolUse","tool_name":"execute_command","tool_input":{"command":"git push origin main"}}' | python3 .bob/hooks/pr_gate.py; rc=$?; set -e
           test "$rc" = 2
+          test -f my-lab.txt
+          cd fieldops-repo
           .venv/bin/python -m pytest -q || test $? = 5

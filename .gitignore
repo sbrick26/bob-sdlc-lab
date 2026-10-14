@@ -1,9 +1,18 @@
 __pycache__/
 *.pyc
-.venv/
+.pytest_cache/
 *.db
-lab.env
 .env
+
+# Written by lab-setup/ at the repo root, never committed.
+lab.env
+my-lab.txt
+
+# The app's virtual environment (fieldops-repo/.venv) and any other venv.
+.venv/
+
+# Hook scratch folder: lives in <git dir>/bob-run/; .bob/run/ is the no-git fallback.
+.bob/run/
 run/
 
 .vscode/
@@ -11,4 +20,3 @@ run/
 lanes/
 .secrets/
 dashboard/
-my-lab.txt

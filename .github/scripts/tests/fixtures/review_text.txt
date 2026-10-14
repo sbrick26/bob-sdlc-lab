@@ -1,5 +1,0 @@
-**VERDICT: PASS**
-CRITERIA: 2/2
-FINDINGS:
-RULES: ok
-TESTS: not run

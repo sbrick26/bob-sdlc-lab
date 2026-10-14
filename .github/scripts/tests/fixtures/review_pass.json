@@ -1,7 +1,0 @@
-{
-  "type": "result",
-  "result": "I read plans/LAB-2.md and the diff.\n\nThe required format is:\nVERDICT: PASS | FAIL\n\nVERDICT: PASS\nCRITERIA: 3/3\nFINDINGS:\n- [advisory] fieldops/store.py:41 Close the cursor in a finally block.\nRULES: ok\nTESTS: 7/7\n",
-  "stats": {
-    "turns": 12
-  }
-}

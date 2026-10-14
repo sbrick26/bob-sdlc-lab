@@ -1,9 +1,11 @@
 #!/bin/sh
-# Bob SDLC lab setup (macOS and Linux). Windows: run setup.ps1.
+# Bob SDLC lab setup (macOS and Linux). Run from the repo folder: ./lab-setup/mac-setup.sh
+# Windows: powershell -ExecutionPolicy Bypass -File .\lab-setup\windows-setup.ps1
 # The only script you run. It checks and installs what the lab needs,
 # asks who you are, connects your Bob hooks to the lab dashboard, and opens Bob IDE.
 set -e
-cd "$(dirname "$0")"
+# Work from the repo root (the folder above lab-setup/), wherever this is started from.
+cd "$(dirname "$0")/.."
 LAB_DASHBOARD_URL="${DASHBOARD_URL:-https://bob-sdlc-lab-dashboard.2fxmskmi3eal.ca-tor.codeengine.appdomain.cloud}"
 
 say()  { printf '%s\n' "$*"; }
@@ -19,9 +21,9 @@ done
 if [ -n "$need_install" ]; then
   if [ "$(uname)" = Darwin ] && command -v brew >/dev/null 2>&1; then
     pkgs=$(echo "$need_install" | sed 's/python3/python@3.12/')
-    if ask "Install$pkgs with Homebrew now?"; then brew install $pkgs; else say "Install$need_install, then run ./setup.sh again."; exit 1; fi
+    if ask "Install$pkgs with Homebrew now?"; then brew install $pkgs; else say "Install$need_install, then run ./lab-setup/mac-setup.sh again."; exit 1; fi
   else
-    say "Install$need_install (macOS: https://brew.sh then brew install$need_install), then run ./setup.sh again."; exit 1
+    say "Install$need_install (macOS: https://brew.sh then brew install$need_install), then run ./lab-setup/mac-setup.sh again."; exit 1
   fi
 fi
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' || { say "Python 3.10 or newer is needed."; exit 1; }
@@ -64,7 +66,7 @@ if [ -z "$GH_LAB_TOKEN" ]; then
   if [ -n "$CUR_GH" ]; then say "   GitHub lab token from your card (saved; press Enter to keep; hidden):"; else say "   GitHub lab token from your card (hidden as you type):"; fi
   printf "> "; stty -echo 2>/dev/null || true; read GH_LAB_TOKEN; stty echo 2>/dev/null || true; echo; if [ -z "$GH_LAB_TOKEN" ]; then GH_LAB_TOKEN="$CUR_GH"; fi
 fi
-[ -n "$DASH_TOKEN" ] && [ -n "$GH_LAB_TOKEN" ] || { say "Both tokens from your card are needed. Run ./setup.sh again."; exit 1; }
+[ -n "$DASH_TOKEN" ] && [ -n "$GH_LAB_TOKEN" ] || { say "Both tokens from your card are needed. Run ./lab-setup/mac-setup.sh again."; exit 1; }
 
 cat > lab.env <<ENV
 LAB_USER=$NAME
@@ -96,8 +98,8 @@ git fetch -q origin demo-dev 2>/dev/null || true
 
 say ""
 say "3. Setting up the app"
-[ -d .venv ] || python3 -m venv .venv
-.venv/bin/pip install -q --disable-pip-version-check -r requirements.txt pytest && ok "FieldOps app and tests"
+[ -d fieldops-repo/.venv ] || python3 -m venv fieldops-repo/.venv
+fieldops-repo/.venv/bin/pip install -q --disable-pip-version-check -r fieldops-repo/requirements.txt pytest && ok "FieldOps app and tests (fieldops-repo/.venv)"
 code=$(curl -s -o /dev/null -w '%{http_code}' -m 8 "$LAB_DASHBOARD_URL/healthz" || echo 000)
 [ "$code" = 200 ] && ok "Lab dashboard reachable" || miss "Lab dashboard not reachable ($code); tell the facilitator. The lab still works."
 
@@ -112,4 +114,5 @@ say "  Lab guide     https://github.com/sbrick26/bob-sdlc-lab/blob/main/docs/par
 say ""
 say "Next: in Bob IDE pick the SDLC Agent mode and type: check my tickets"
 say "The first Jira call opens a browser: sign in with your Jira login above."
+say "Run this setup again any time: ./lab-setup/mac-setup.sh   App on its own: cd fieldops-repo && ./run.sh"
 if [ "$(uname)" = Darwin ]; then open -a "IBM Bob" "$(pwd)" 2>/dev/null || true; fi

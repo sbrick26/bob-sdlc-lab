@@ -1,7 +1,8 @@
-# Bob SDLC lab setup for Windows (PowerShell 5.1 or 7). macOS and Linux: run ./setup.sh
-# Run from the repo folder:  powershell -ExecutionPolicy Bypass -File .\setup.ps1
+# Bob SDLC lab setup for Windows (PowerShell 5.1 or 7). macOS and Linux: ./lab-setup/mac-setup.sh
+# Run from the repo folder:  powershell -ExecutionPolicy Bypass -File .\lab-setup\windows-setup.ps1
 $ErrorActionPreference = 'Stop'
-Set-Location -Path $PSScriptRoot
+# Work from the repo root (the folder above lab-setup\), wherever this is started from.
+Set-Location -Path (Split-Path -Parent $PSScriptRoot)
 $DashboardUrl = if ($env:DASHBOARD_URL) { $env:DASHBOARD_URL } else { 'https://bob-sdlc-lab-dashboard.2fxmskmi3eal.ca-tor.codeengine.appdomain.cloud' }
 
 function Ok($t)   { Write-Host "  ok       $t" }
@@ -34,11 +35,11 @@ if ($needs.Count -gt 0) {
     $a = Read-Host "Install $($needs -join ', ') with winget now? [y/N]"
     if ($a -match '^[yY]') {
       foreach ($n in $needs) { winget install --id $n -e --accept-source-agreements --accept-package-agreements }
-      Write-Host "Installed. Close this window, open a new PowerShell, and run setup.ps1 again so the new tools are on PATH."
+      Write-Host "Installed. Close this window, open a new PowerShell, and run .\lab-setup\windows-setup.ps1 again so the new tools are on PATH."
       exit 0
     }
   }
-  Write-Host "Install $($needs -join ', ') (winget or the vendor sites), then run setup.ps1 again."; exit 1
+  Write-Host "Install $($needs -join ', ') (winget or the vendor sites), then run .\lab-setup\windows-setup.ps1 again."; exit 1
 }
 # Bob's hooks run "python3 ...". Windows Python seldom provides python3, so add a small shim on the user PATH.
 $shimDir = Join-Path $env:USERPROFILE '.bob-lab\bin'
@@ -88,7 +89,7 @@ if ($env:LAB_GH_TOKEN) { $GhToken = $env:LAB_GH_TOKEN } else {
   $GhToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
   if (-not $GhToken) { $GhToken = $cur['LAB_GH_TOKEN'] }
 }
-if (-not $DashToken -or -not $GhToken) { Write-Host 'Both tokens from your card are needed. Run setup.ps1 again.'; exit 1 }
+if (-not $DashToken -or -not $GhToken) { Write-Host 'Both tokens from your card are needed. Run .\lab-setup\windows-setup.ps1 again.'; exit 1 }
 @(
   "LAB_USER=$Name", 'LAB_ROLE=participant', 'LAB_TEAM=',
   "DASHBOARD_URL=$DashboardUrl", "DASHBOARD_TOKEN=$DashToken", "LAB_GH_TOKEN=$GhToken"
@@ -114,9 +115,10 @@ git fetch -q origin demo-dev 2>$null
 
 Write-Host ""
 Write-Host "3. Setting up the app"
-if (-not (Test-Path '.venv')) { & $pyExe -m venv .venv }
-& .\.venv\Scripts\python.exe -m pip install -q --disable-pip-version-check -r requirements.txt pytest
-Ok 'FieldOps app and tests'
+if (-not (Test-Path 'fieldops-repo\.venv')) { & $pyExe -m venv fieldops-repo\.venv }
+& .\fieldops-repo\.venv\Scripts\python.exe -m pip install -q --disable-pip-version-check -r fieldops-repo\requirements.txt pytest
+if ($LASTEXITCODE -ne 0) { Write-Host 'pip install failed.'; exit 1 }
+Ok 'FieldOps app and tests (fieldops-repo\.venv)'
 try { $r = Invoke-WebRequest -Uri "$DashboardUrl/healthz" -UseBasicParsing -TimeoutSec 8; Ok 'Lab dashboard reachable' }
 catch { Miss 'Lab dashboard not reachable; tell the facilitator. The lab still works.' }
 
@@ -131,4 +133,5 @@ Write-Host "  Lab guide     https://github.com/sbrick26/bob-sdlc-lab/blob/main/d
 Write-Host ""
 Write-Host "Next: in Bob IDE pick the SDLC Agent mode and type: check my tickets"
 Write-Host "The first Jira call opens a browser: sign in with your Jira login above."
+Write-Host "Run this setup again any time: powershell -ExecutionPolicy Bypass -File .\lab-setup\windows-setup.ps1"
 if ($bobExe) { Start-Process -FilePath $bobExe -ArgumentList "`"$PWD`"" }

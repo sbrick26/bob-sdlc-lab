@@ -81,7 +81,7 @@ rules:
   - id: GOV-PII-001
     type: builtin
     name: Unmasked customer phone number
-    description: Stops a file write that contains an unmasked US phone number outside data/ and tests/.
+    description: Stops a file write that contains an unmasked US phone number outside fieldops-repo/data/ and fieldops-repo/tests/.
     remediation: Mask phone numbers as 415-555-**** before writing.
     severity: high
     enabled: true
@@ -106,4 +106,4 @@ rules:
     action: block
     applies_to: [prompt, file_write]
     pattern: '\bACCT-\d{8}\b'
-    exclude_paths: ["data/*", "tests/*"]
+    exclude_paths: ["fieldops-repo/data/*", "fieldops-repo/tests/*"]

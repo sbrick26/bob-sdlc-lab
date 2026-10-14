@@ -11,16 +11,17 @@ Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-build mode; switch 
 
 # Build
 
-Preconditions: the Jira ticket has a comment starting with "Approved" posted after its most recent "Spec for review" comment (the requester's approval; it may come from any account). Write `Requester approval: approved by <author> in Jira on <YYYY-MM-DD>` into the plan as plain text (no bold, no backticks), and the comment link on the next line. If plans/<KEY>.md is missing on this machine, rebuild it from the "Spec for review" comment. If there is no approval, stop and say the spec is waiting for the requester.
+Preconditions: the Jira ticket has a comment starting with "Approved" posted after its most recent "Spec for review" comment (the requester's approval; it may come from any account). Write `Requester approval: approved by <author> in Jira on <YYYY-MM-DD>` into the plan as plain text (no bold, no backticks), and the comment link on the next line. If fieldops-repo/plans/<KEY>.md is missing on this machine, rebuild it from the "Spec for review" comment. If there is no approval, stop and say the spec is waiting for the requester.
 
 1. Move the ticket to In Progress and comment "Build started".
 2. Follow the build order in your mode rules exactly.
 
 Facts that save you turns:
-- Tests: `.venv/bin/python -m pytest -q`. Tests must not change data/work_orders.csv; copy it to a temp dir in a fixture.
+- The app, its tests and the ticket files live in fieldops-repo/. Git, the hooks and .bob/ stay at the repo root.
+- Tests: `cd fieldops-repo && .venv/bin/python -m pytest -q` (run from the repo root). Tests go in fieldops-repo/tests/. Tests must not change fieldops-repo/data/work_orders.csv; copy it to a temp dir in a fixture.
 - The user name for the branch is the user line in my-lab.txt. Never open lab.env.
-- Change note: write changes/<KEY>.md.
+- Change note: write fieldops-repo/changes/<KEY>.md.
 - PR: `./.bob/scripts/lab-gh pr create --base demo-dev --label <user> --title "<KEY>: <title>" --body-file <file>`. The body starts with `Opened by <name> for <KEY>.` then the sections of .github/pull_request_template.md.
 - The pr-gate hook runs before every push and PR. If it refuses, it prints the missing checklist item. Fix that item. Never add --no-verify.
-- Self-review subagent prompt: "Compare `git diff origin/demo-dev...HEAD` with plans/<KEY>.md. List each acceptance criterion as met or not met with evidence. List any file changed outside Work units. Nothing else."
+- Self-review subagent prompt: "Compare `git diff origin/demo-dev...HEAD` with fieldops-repo/plans/<KEY>.md. List each acceptance criterion as met or not met with evidence. List any file changed outside Work units. Nothing else."
 - At the end: comment the PR link on the Jira ticket, move it to In Review, say CI is now reviewing the pull request, switch back to the sdlc mode (SDLC Agent) and say so, and end with the "Your links" block.

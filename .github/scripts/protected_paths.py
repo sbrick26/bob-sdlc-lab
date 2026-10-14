@@ -2,14 +2,14 @@
 """Deterministic protected-paths check. No model.
 
 Reads changed paths (one per line) on stdin. Fails (exit 1) when any path is under
-.bob/, .github/ or governance/, unless ALLOW_PROTECTED=true
+.bob/ (hooks, plugin, governance) or .github/, unless ALLOW_PROTECTED=true
 (set by the workflow when the PR author is the repo owner or the PR has the
 `platform` label). Exit 0 otherwise.
 """
 import os
 import sys
 
-PROTECTED = (".bob/", ".github/", "governance/")
+PROTECTED = (".bob/", ".github/")
 
 
 def hits(paths):

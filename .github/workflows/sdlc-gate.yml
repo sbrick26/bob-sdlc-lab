@@ -1,11 +1,11 @@
 # SDLC gate for the lab repo.
 #
 # Jobs:
-#   tests            pytest on every PR and push to main (no tests yet = pass).
-#   protected-paths  deterministic: a PR may not touch .bob/ .github/ governance/
+#   tests            pytest in fieldops-repo/ on every PR and push to main (no tests yet = pass).
+#   protected-paths  deterministic: a PR may not touch .bob/ (incl. .bob/governance/) or .github/
 #                    unless the author is the repo owner or the
 #                    PR has the `platform` label.
-#   bob-review       headless Bob review of the PR against plans/<KEY>.md. Rules,
+#   bob-review       headless Bob review of the PR against fieldops-repo/plans/<KEY>.md. Rules,
 #                    hooks, modes, checklist and CI helpers come from main, never
 #                    from the PR. No VERDICT line = fail closed.
 #   merged           on push to main: report the merge to the dashboard and move
@@ -55,11 +55,12 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install
-        run: pip install -r requirements.txt pytest pyyaml
-      - name: Check the plugin, CI scripts and settings files
-        run: python -m pytest -q .github/scripts/tests
+        run: pip install -r fieldops-repo/requirements.txt pytest pyyaml
+      - name: Check the Bob plugin files
+        run: python .github/scripts/check_plugin_files.py
       - name: Run pytest
         id: pytest
+        working-directory: fieldops-repo
         run: |
           set +e
           python -m pytest -q 2>&1 | tee "$RUNNER_TEMP/pytest.txt"
@@ -134,14 +135,14 @@ jobs:
           path: main-rules
 
       - name: Pin rules, hooks, modes and checklist to main
-        # A PR must not change the rules that judge it. Replace .bob/ and
-        # governance/ in the PR checkout with main's copy. The PR's edits to
+        # A PR must not change the rules that judge it. Replace .bob/ (hooks,
+        # plugin, .bob/governance/) in the PR checkout with main's copy. The PR's edits to
         # them still show in pr.diff, and protected-paths fails them anyway.
         run: |
           mv main-rules "$MAIN_DIR"
-          rm -rf .bob governance
-          cp -a "$MAIN_DIR/.bob" "$MAIN_DIR/governance" .
-          rm -rf .bob/run
+          rm -rf .bob
+          cp -a "$MAIN_DIR/.bob" .
+          rm -rf .bob/run "$(git rev-parse --git-dir)/bob-run"
           mkdir -p "$OUT_DIR"
 
       - uses: actions/setup-python@v5
@@ -149,7 +150,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python dependencies (the reviewer runs the tests)
-        run: pip install -r requirements.txt pytest pyyaml
+        run: pip install -r fieldops-repo/requirements.txt pytest pyyaml
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
@@ -210,7 +211,7 @@ jobs:
           if [ -z "$BOBSHELL_API_KEY" ]; then
             echo "::error::BOBSHELL_API_KEY is not set. The review cannot run, the gate fails closed."
           fi
-          prompt="Review branch $BRANCH for ticket $KEY against plans/$KEY.md using the review skill. The diff is in pr.diff. End with the verdict block."
+          prompt="Review branch $BRANCH for ticket $KEY against fieldops-repo/plans/$KEY.md using the review skill. The diff is in pr.diff. End with the verdict block."
           if [ "$REVIEW_MODE" != "sdlc-review" ]; then
             # Fallback: plugin modes did not resolve headless. Put the review
             # skill and the verdict format (both from main) in the prompt.

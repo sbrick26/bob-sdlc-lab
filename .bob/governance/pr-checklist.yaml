@@ -1,5 +1,6 @@
-# The PR checklist. The pr-gate hook reads this before every git push and gh pr create.
+# The PR checklist (.bob/governance/pr-checklist.yaml). The pr-gate hook reads this before every git push and gh pr create.
 # Plain words in "says". Types: branch_not, file_exists, file_contains, marker, command_not_contains.
+# Paths are from the repo root. A marker is a file name in the hooks' scratch folder <git dir>/bob-run/.
 checks:
   - id: branch-not-main
     says: "You are on a ticket branch, not main."
@@ -10,22 +11,22 @@ checks:
     type: branch_not
     value: demo-dev
   - id: plan-exists
-    says: "A spec exists at plans/{KEY}.md."
+    says: "A spec exists at fieldops-repo/plans/{KEY}.md."
     type: file_exists
-    value: plans/{KEY}.md
+    value: fieldops-repo/plans/{KEY}.md
   - id: plan-approved
     says: "The requester approved the spec."
     type: file_contains
-    path: plans/{KEY}.md
+    path: fieldops-repo/plans/{KEY}.md
     value: "Requester approval: approved"
   - id: tests-passed
     says: "The tests passed in this session."
     type: marker
-    value: .bob/run/tests-passed
+    value: tests-passed
   - id: changelog
-    says: "changes/{KEY}.md exists and names {KEY}."
+    says: "fieldops-repo/changes/{KEY}.md exists and names {KEY}."
     type: file_contains
-    path: changes/{KEY}.md
+    path: fieldops-repo/changes/{KEY}.md
     value: "{KEY}"
   - id: no-shortcuts
     says: "No --no-verify and no --force."

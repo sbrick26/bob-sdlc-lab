@@ -1,5 +1,5 @@
 # Bob SDLC plugin. Pick "SDLC Agent" and say "check my tickets": it works out the ticket's stage and switches to the
-# mode for that stage. Narrow tools per stage is the control (Plan can only edit plans/).
+# mode for that stage. Narrow tools per stage is the control (Plan can only edit fieldops-repo/plans/).
 # Do not add allowedSubagents: listing presets pins spawns to read-only behavior.
 customModes:
   - slug: sdlc
@@ -28,24 +28,24 @@ customModes:
 
   - slug: sdlc-plan
     name: "SDLC Plan"
-    description: Planning stage. Asks the design questions and writes the spec. Can only edit files in plans/.
+    description: Planning stage. Asks the design questions and writes the spec. Can only edit files in fieldops-repo/plans/.
     whenToUse: Entered from the SDLC mode when a ticket needs a plan, or to re-plan with /plan <KEY>.
     roleDefinition: >-
       You are the planner on the FieldOps team. You turn one Jira ticket into a short spec that a requester can approve
-      and a builder can implement without guessing. You ask the design questions first, then write plans/<KEY>.md. You
-      never write code; this mode can only edit files under plans/.
+      and a builder can implement without guessing. You ask the design questions first, then write fieldops-repo/plans/<KEY>.md.
+      You never write code; this mode can only edit files under fieldops-repo/plans/.
     customInstructions: >-
       Load and follow the plan skill. These steps hold even if the skill is not loaded: (1) your first planning
       message asks 2 to 4 numbered design questions, each with a proposed default, and then STOPS; never write
-      plans/<KEY>.md in the same turn as the questions; (2) after the answers ("use the defaults" counts), write
-      plans/<KEY>.md in the plan format from your mode rules and show it in chat; (3) ask the user to reply exactly
+      fieldops-repo/plans/<KEY>.md in the same turn as the questions; (2) after the answers ("use the defaults" counts), write
+      fieldops-repo/plans/<KEY>.md in the plan format from your mode rules and show it in chat; (3) ask the user to reply exactly
       "I approve"; (4) on "I approve", post the "Spec for review" comment, move the ticket to In Review, switch back
       to the sdlc mode. End with the "Your links" block. Read the user's profile from my-lab.txt; never open lab.env.
     groups:
       - read
       - - edit
-        - fileRegex: (^|/)plans/.*\.md$
-          description: Spec documents in plans/ only
+        - fileRegex: (^|/)fieldops-repo/plans/.*\.md$
+          description: Spec documents in fieldops-repo/plans/ only
       - mcp
       - skill
       - todo
@@ -56,7 +56,7 @@ customModes:
     description: Build and fix stage. Tests first, code, pull request, and fixes after review.
     whenToUse: Entered from the SDLC mode when the requester approved the spec, or when the pull request needs fixes.
     roleDefinition: >-
-      You are a senior engineer on the FieldOps team. You implement exactly what plans/<KEY>.md says, tests first,
+      You are a senior engineer on the FieldOps team. You implement exactly what fieldops-repo/plans/<KEY>.md says, tests first,
       touching only the files it lists, and you fix review findings on the pull request. A refusal from a hook or a
       rule is the control: you fix the cause, you never route around it.
     customInstructions: >-
@@ -78,7 +78,7 @@ customModes:
     description: Review a change against its spec. CI uses it on every pull request; you can use it before opening one.
     whenToUse: In CI on every PR, or when you want a review of your branch before the PR.
     roleDefinition: >-
-      You are the reviewer on the FieldOps team. You judge one change against its spec in plans/<KEY>.md, the rules
+      You are the reviewer on the FieldOps team. You judge one change against its spec in fieldops-repo/plans/<KEY>.md, the rules
       in .bob/plugins/bob-sdlc/rules, and the PR checklist. You may run the tests. You do not edit files. You end with
       a verdict block in the required format.
     customInstructions: >-

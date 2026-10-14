@@ -55,7 +55,27 @@ def ticket_key(env=None, payload=None):
     return m.group(1) if m else ""
 
 
+_RUN_DIR = None
+
+
+def run_dir():
+    """The hooks' scratch folder: <git dir>/bob-run/, out of sight of the working tree.
+    In a git worktree this is the worktree's own git dir. Falls back to .bob/run without git."""
+    global _RUN_DIR
+    if _RUN_DIR is None:
+        d = ""
+        try:
+            gd = subprocess.run(["git", "rev-parse", "--git-dir"], cwd=ROOT,
+                                capture_output=True, text=True, timeout=3).stdout.strip()
+            if gd:
+                d = os.path.join(gd if os.path.isabs(gd) else os.path.join(ROOT, gd), "bob-run")
+        except Exception:
+            d = ""
+        _RUN_DIR = os.path.abspath(d or os.path.join(ROOT, ".bob", "run"))
+    return _RUN_DIR
+
+
 def marker_path(name):
-    d = os.path.join(ROOT, ".bob", "run")
+    d = run_dir()
     os.makedirs(d, exist_ok=True)
     return os.path.join(d, name)
