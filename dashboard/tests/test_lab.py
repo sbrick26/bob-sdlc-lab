@@ -269,3 +269,12 @@ def test_lab_mode_publish_activates_policy_without_mdm(monkeypatch):
     after = client.get("/api/v1/policies", auth=AUTH).json()["policy_version"]
     assert after != before
     assert db._repo().get_json("policies/active.json")["version"] == after
+
+
+def test_package_rule_ignores_shell_redirection(monkeypatch):
+    monkeypatch.delenv("LAB_PACKAGE_ALLOWLIST", raising=False)
+    from app.main import package_install_findings
+    allow = {"python": ["flask", "pytest", "mcp", "pyyaml"], "node": []}
+    assert package_install_findings({"command": ".venv/bin/pip install mcp==2.3.0 2>&1 | tail -3"}, allow)[1] == []
+    assert package_install_findings({"command": "pip install mcp > /tmp/x.log 2>/dev/null"}, allow)[1] == []
+    assert package_install_findings({"command": "pip install requests 2>&1"}, allow)[1] == ["requests"]

@@ -304,6 +304,11 @@ def package_install_findings(
                     continue
                 if arg.startswith("-"):
                     continue
+                if re.match(r"^\d*(>>?|<|&>)", arg) or arg in {"&", "2>&1"}:
+                    # shell redirection (2>&1, >log, 2>/dev/null) is not a package
+                    if re.fullmatch(r"\d*(>>?|<|&>)", arg):
+                        skip_value = True
+                    continue
                 package = _package_name(arg, ecosystem)
                 if package and not package.startswith((".", "/", "git+", "http://", "https://")):
                     requested.append(package)
