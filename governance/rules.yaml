@@ -1,0 +1,109 @@
+# Governance rules for Bob. The dashboard reads this file from main on GitHub
+# every 60 seconds; a change takes effect after it is merged through a PR.
+#
+# Built-in rules (type: builtin) keep their matching logic in the governance
+# service. This file switches them on or off and supplies the text people see,
+# the severity and, for GOV-PKG-001, the approved package lists.
+#
+# Pattern rules (type: pattern) are matched by a regular expression:
+#   action       block (stop the action) or flag (record it, let it run)
+#   applies_to   any of: prompt, command, file_write, tool_input
+#   pattern      a Python regular expression, at most 500 characters
+#   exclude_paths  optional globs; file writes to these paths are not checked
+version: 1
+rules:
+  - id: GOV-PROMPT-001
+    type: builtin
+    name: Known credential format
+    description: Stops a prompt that contains a known key or token format, such as sk-, ghp_, AKIA, a JWT or a private key, before Bob sees it.
+    remediation: Remove the credential. Use an environment variable or the secret store.
+    severity: high
+    enabled: true
+    control_points: [prompt]
+
+  - id: GOV-PROMPT-002
+    type: builtin
+    name: Labeled secret
+    description: Stops a prompt that has a long secret-looking value next to words like api key, token, secret or password.
+    remediation: Remove the credential. Use an environment variable or the secret store.
+    severity: high
+    enabled: true
+    control_points: [prompt]
+
+  - id: GOV-TOOL-001
+    type: builtin
+    name: Credential in tool input
+    description: Stops a tool call when the input Bob is about to pass to the tool contains a credential.
+    remediation: Remove the credential. Use an environment variable or the secret store.
+    severity: high
+    enabled: true
+    control_points: [tool_input]
+
+  - id: GOV-POST-001
+    type: builtin
+    name: Credential in tool output
+    description: Records a credential found in a tool's output and warns Bob on its next turn.
+    remediation: Do not copy the credential from the tool output. Use an environment variable or the secret store.
+    severity: high
+    enabled: true
+    control_points: [tool_output]
+
+  - id: GOV-RESP-001
+    type: builtin
+    name: Credential in assistant response
+    description: Records a credential found in Bob's final answer.
+    remediation: Do not reuse the credential from the answer. Rotate it if it is real.
+    severity: high
+    enabled: true
+    control_points: [response]
+
+  - id: GOV-HOOK-001
+    type: builtin
+    name: Unscannable payload
+    description: Stops a prompt or tool call that is too large to inspect.
+    remediation: Send a smaller input.
+    severity: high
+    enabled: true
+    control_points: [prompt, tool_input]
+
+  - id: GOV-PKG-001
+    type: builtin
+    name: Unapproved package installation
+    description: Stops a pip or npm install unless every package is on the approved list below.
+    remediation: Ask for the package to be added to the approved list, or use an approved one.
+    severity: high
+    enabled: true
+    control_points: [command]
+    allowlist:
+      python: [flask, pytest, mcp, pyyaml]
+      node: [axios, eslint, express, prettier, react, react-dom, typescript]
+
+  - id: GOV-PII-001
+    type: builtin
+    name: Unmasked customer phone number
+    description: Stops a file write that contains an unmasked US phone number outside data/ and tests/.
+    remediation: Mask phone numbers as 415-555-**** before writing.
+    severity: high
+    enabled: true
+    control_points: [file_write]
+
+  - id: GOV-GIT-001
+    type: builtin
+    name: Unsafe git command
+    description: Stops git commands that skip hooks, force-push or push straight to main.
+    remediation: Push your ticket branch without --no-verify or --force and open a PR.
+    severity: high
+    enabled: true
+    control_points: [git_command]
+
+  - id: GOV-ACCT-001
+    type: pattern
+    name: Customer account number
+    description: Stops a prompt or file write that contains a customer account number like ACCT-12345678.
+    remediation: Remove the account number; use the ticket id instead.
+    severity: medium
+    enabled: false
+    action: block
+    applies_to: [prompt, file_write]
+    pattern: '\bACCT-\d{8}\b'
+    exclude_paths: ["data/*", "tests/*"]
