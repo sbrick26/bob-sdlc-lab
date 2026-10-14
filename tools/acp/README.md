@@ -109,6 +109,13 @@ tools/acp/steer status           # phase, pending permission, session id
 LANE=t1 tools/acp/steer status   # act on run/t1/
 ```
 
+## Rehearsal harness
+
+`tools/acp/lab-check.sh run [--serial] [--detour] [names...]` runs the whole lab headless,
+one git worktree lane per participant (`lanes/<name>`, gitignored), and checks every step
+against Jira, git, GitHub and the dashboard. `lab-check.sh clean [names...]` resets the
+lanes, PRs, branches and Jira tickets. See [lanes.md](lanes.md).
+
 ## Notes
 
 * **Mode, Bob 2.0.6:** `session/new` accepts `_meta: {"bob/mode": "<id>"}` and the
