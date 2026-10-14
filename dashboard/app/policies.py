@@ -30,6 +30,7 @@ RULES: dict[str, dict[str, Any]] = {
         "decision": "blocked",
         "severity": "high",
         "enforcement": "exit 2 before model",
+        "remediation": "Remove the credential. Use an environment variable or the secret store.",
     },
     "GOV-PROMPT-002": {
         "name": "Labeled secret",
@@ -38,6 +39,7 @@ RULES: dict[str, dict[str, Any]] = {
         "decision": "blocked",
         "severity": "high",
         "enforcement": "exit 2 before model",
+        "remediation": "Remove the credential. Use an environment variable or the secret store.",
     },
     "GOV-TOOL-001": {
         "name": "Credential in tool input",
@@ -46,6 +48,7 @@ RULES: dict[str, dict[str, Any]] = {
         "decision": "blocked",
         "severity": "high",
         "enforcement": "exit 2 before tool",
+        "remediation": "Remove the credential. Use an environment variable or the secret store.",
     },
     "GOV-POST-001": {
         "name": "Credential in tool output",
@@ -54,6 +57,7 @@ RULES: dict[str, dict[str, Any]] = {
         "decision": "observed",
         "severity": "high",
         "enforcement": "next-turn context",
+        "remediation": "Do not copy the credential from the tool output. Use an environment variable or the secret store.",
     },
     "GOV-RESP-001": {
         "name": "Credential in assistant response",
@@ -62,6 +66,7 @@ RULES: dict[str, dict[str, Any]] = {
         "decision": "observed",
         "severity": "high",
         "enforcement": "record only",
+        "remediation": "Do not reuse the credential from the answer. Rotate it if it is real.",
     },
     "GOV-HOOK-001": {
         "name": "Unscannable payload",
@@ -70,6 +75,7 @@ RULES: dict[str, dict[str, Any]] = {
         "decision": "blocked",
         "severity": "high",
         "enforcement": "exit 2 before model or tool",
+        "remediation": "Send a smaller input.",
     },
     "GOV-PKG-001": {
         "name": "Unapproved package installation",
@@ -78,6 +84,7 @@ RULES: dict[str, dict[str, Any]] = {
         "decision": "blocked",
         "severity": "high",
         "enforcement": "exit 2 before tool",
+        "remediation": "Ask for the package to be added to the approved list, or use an approved one.",
         "configuration": {"allowlist": PACKAGE_ALLOWLIST},
     },
     "GOV-PII-001": {
@@ -87,6 +94,7 @@ RULES: dict[str, dict[str, Any]] = {
         "decision": "blocked",
         "severity": "high",
         "enforcement": "exit 2 before tool",
+        "remediation": "Mask phone numbers as 415-555-**** before writing.",
     },
     "GOV-GIT-001": {
         "name": "Unsafe git command",
@@ -95,6 +103,7 @@ RULES: dict[str, dict[str, Any]] = {
         "decision": "blocked",
         "severity": "high",
         "enforcement": "exit 2 before tool",
+        "remediation": "Push your ticket branch without --no-verify or --force and open a PR.",
     },
 }
 

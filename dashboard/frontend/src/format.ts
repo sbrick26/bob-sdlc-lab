@@ -44,13 +44,33 @@ export function median(values: number[]): number | null {
   return clean.length % 2 ? clean[middle] : (clean[middle - 1] + clean[middle]) / 2;
 }
 
-/** Label for a local-time bucket from the API ("2026-10-13" or "2026-10-13T14:00:00"). */
+/** Label for a bucket start ("2026-10-13"): "Oct 13", "Week of Oct 6" or "Oct 2026". Hour buckets keep the hour. */
 export function bucketLabel(bucket: string, granularity: string): string {
-  const date = new Date(granularity === 'hour' ? bucket : `${bucket}T12:00:00`);
+  const date = new Date(granularity === 'hour' ? bucket : `${bucket.slice(0, 10)}T12:00:00`);
   if (Number.isNaN(date.getTime())) return bucket;
-  return granularity === 'hour'
-    ? date.toLocaleString('en-US', { hour: 'numeric', hour12: true })
-    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (granularity === 'hour') return date.toLocaleString('en-US', { hour: 'numeric', hour12: true });
+  if (granularity === 'month') return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  const day = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return granularity === 'week' ? `Week of ${day}` : day;
+}
+
+/** Event types in plain words. The raw name stays in the drawer's technical details. */
+export const EVENT_WORDS: Record<string, string> = {
+  UserPromptSubmit: 'Prompt sent', PreToolUse: 'Before tool', PostToolUse: 'After tool', SessionStart: 'Session start',
+  Stop: 'Turn ended', 'lab.ci_result': 'CI review', 'lab.pr_opened': 'PR opened', 'lab.approved': 'PR approved',
+  'lab.merged': 'PR merged', 'lab.ticket_started': 'Ticket started', 'lab.ticket_done': 'Ticket done',
+};
+export const eventWords = (event: string | null | undefined) => (event ? EVENT_WORDS[event] ?? event : '—');
+
+export const DECISION_WORDS: Record<string, string> = { allowed: 'Allowed', blocked: 'Blocked', observed: 'Flagged', error: 'Error' };
+
+/**
+ * Ids to highlight after a load. Only a refetch triggered by the live stream
+ * highlights, and only ids that were not loaded before for the same view.
+ */
+export function freshIds(previous: Set<string> | null, current: string[], viewChanged: boolean, fromStream: boolean): Set<string> {
+  if (!previous || viewChanged || !fromStream) return new Set();
+  return new Set(current.filter((id) => !previous.has(id)));
 }
 
 export function shortTime(value: string | null | undefined): string {
@@ -109,3 +129,62 @@ export function writeNumber(key: string, value: number | null, store: StorageLik
 
 export const BASELINE_KEY = 'governance.baselineHoursPerTicket';
 export const RATE_KEY = 'governance.usdPerBobcoin';
+
+/** Seconds as "4.5 s", "8.5 min" or "1.2 h". */
+export function seconds(value: Num): string {
+  if (!finite(value)) return '—';
+  if (value < 60) return `${value.toFixed(1)} s`;
+  if (value < 3600) return `${(value / 60).toFixed(1)} min`;
+  return `${(value / 3600).toFixed(1)} h`;
+}
+
+export function millis(value: Num): string {
+  return finite(value) ? `${value < 10 ? value.toFixed(2) : Math.round(value)} ms` : '—';
+}
+
+export type Preset = 'today' | '7d' | '30d' | 'month' | 'custom';
+export const PRESETS: Array<{ id: Preset; label: string }> = [
+  { id: 'today', label: 'Today' },
+  { id: '7d', label: 'Last 7 days' },
+  { id: '30d', label: 'Last 30 days' },
+  { id: 'month', label: 'This month' },
+  { id: 'custom', label: 'Custom range' },
+];
+
+/** Local calendar date as YYYY-MM-DD. */
+export function isoDay(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Inclusive local date range for a preset. Custom keeps the given range. */
+export function presetRange(preset: Preset, today: Date, custom?: { since: string; until: string }): { since: string; until: string } {
+  const day = (offset: number) => isoDay(new Date(today.getFullYear(), today.getMonth(), today.getDate() - offset));
+  switch (preset) {
+    case 'today': return { since: day(0), until: day(0) };
+    case '30d': return { since: day(29), until: day(0) };
+    case 'month': return { since: isoDay(new Date(today.getFullYear(), today.getMonth(), 1)), until: day(0) };
+    case 'custom': return custom && custom.since && custom.until && custom.since <= custom.until ? custom : { since: day(6), until: day(0) };
+    default: return { since: day(6), until: day(0) };
+  }
+}
+
+/** Number of days in an inclusive range. */
+export function rangeDays(since: string, until: string): number {
+  const start = new Date(`${since}T12:00:00`).getTime();
+  const end = new Date(`${until}T12:00:00`).getTime();
+  return Number.isFinite(start) && Number.isFinite(end) ? Math.round((end - start) / 86_400_000) + 1 : 0;
+}
+
+export type Better = 'up' | 'down' | null;
+
+/** "+12% vs prior 7 days" and its tone. Tone is set only when the direction has a clear meaning. */
+export function deltaText(pct: Num, days: number | null | undefined, better: Better): { text: string; tone: 'good' | 'bad' | 'neutral' } | null {
+  if (!finite(pct)) return null;
+  const sign = pct > 0 ? '+' : pct < 0 ? '−' : '±';
+  const period = days === 1 ? 'prior day' : `prior ${days ?? ''} days`.replace('  ', ' ');
+  const text = `${sign}${Math.abs(Math.round(pct))}% vs ${period}`;
+  if (!better || pct === 0) return { text, tone: 'neutral' };
+  const good = better === 'up' ? pct > 0 : pct < 0;
+  return { text, tone: good ? 'good' : 'bad' };
+}

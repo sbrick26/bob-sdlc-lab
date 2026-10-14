@@ -62,3 +62,44 @@ test('bucket labels for day and hour buckets', () => {
   assert.match(bucketLabel('2026-10-13T14:00:00Z', 'hour'), /PM|AM/);
   assert.equal(bucketLabel('not a date', 'day'), 'not a date');
 });
+
+import { deltaText, presetRange, rangeDays, seconds } from '../src/format.ts';
+
+test('date presets give inclusive local ranges', () => {
+  const today = new Date(2026, 9, 13);
+  assert.deepEqual(presetRange('today', today), { since: '2026-10-13', until: '2026-10-13' });
+  assert.deepEqual(presetRange('7d', today), { since: '2026-10-07', until: '2026-10-13' });
+  assert.deepEqual(presetRange('30d', today), { since: '2026-09-14', until: '2026-10-13' });
+  assert.deepEqual(presetRange('month', today), { since: '2026-10-01', until: '2026-10-13' });
+  assert.deepEqual(presetRange('custom', today, { since: '2026-10-01', until: '2026-10-03' }), { since: '2026-10-01', until: '2026-10-03' });
+  assert.deepEqual(presetRange('custom', today, { since: '2026-10-05', until: '2026-10-03' }), { since: '2026-10-07', until: '2026-10-13' });
+  assert.equal(rangeDays('2026-10-07', '2026-10-13'), 7);
+});
+
+test('deltas: tone only where direction has a meaning, nothing without prior data', () => {
+  assert.deepEqual(deltaText(12.4, 7, 'up'), { text: '+12% vs prior 7 days', tone: 'good' });
+  assert.deepEqual(deltaText(12.4, 7, 'down'), { text: '+12% vs prior 7 days', tone: 'bad' });
+  assert.deepEqual(deltaText(-30, 1, null), { text: '−30% vs prior day', tone: 'neutral' });
+  assert.equal(deltaText(null, 7, 'up'), null);
+  assert.equal(seconds(4.5), '4.5 s');
+  assert.equal(seconds(510), '8.5 min');
+});
+
+import { bucketLabel as label2, eventWords, freshIds } from '../src/format.ts';
+
+test('new-row highlight only for rows that arrive by the live stream after the first load', () => {
+  const before = new Set(['a', 'b']);
+  assert.deepEqual([...freshIds(null, ['a', 'b'], true, false)], []);              // first load or page refresh
+  assert.deepEqual([...freshIds(before, ['c', 'a', 'b'], false, true)], ['c']);    // stream refetch
+  assert.deepEqual([...freshIds(before, ['c', 'a', 'b'], true, true)], []);        // filter changed: new baseline
+  assert.deepEqual([...freshIds(before, ['c', 'a', 'b'], false, false)], []);      // manual refresh, not the stream
+});
+
+test('plain words for event types and bucket labels', () => {
+  assert.equal(eventWords('UserPromptSubmit'), 'Prompt sent');
+  assert.equal(eventWords('Stop'), 'Turn ended');
+  assert.equal(eventWords('lab.ci_result'), 'CI review');
+  assert.equal(eventWords('Custom'), 'Custom');
+  assert.equal(label2('2026-10-06', 'week'), 'Week of Oct 6');
+  assert.equal(label2('2026-10-01', 'month'), 'Oct 2026');
+});

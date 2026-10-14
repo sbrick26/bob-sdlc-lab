@@ -160,8 +160,8 @@ def test_lab_headers_are_stored_filtered_and_faceted():
 def test_invalid_lab_headers_are_dropped():
     response = hook("UserPromptSubmit", headers=lab_headers(ticket="not a ticket", role="admin"), prompt="hello")
     event = client.get(f"/api/v1/events/{response.json()['event_id']}", auth=AUTH).json()["event"]
-    assert event["lab_ticket"] is None
-    assert event["lab_role"] is None
+    assert event.get("lab_ticket") is None
+    assert event.get("lab_role") is None
 
 
 def test_lab_events_require_ingest_token_and_valid_shape():

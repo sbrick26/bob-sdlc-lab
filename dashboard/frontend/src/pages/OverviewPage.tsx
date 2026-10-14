@@ -1,82 +1,101 @@
-import { GroupedBarChart, SimpleBarChart, StackedBarChart } from '@carbon/charts-react';
-import { Button } from '@carbon/react';
+import { SimpleBarChart, StackedBarChart } from '@carbon/charts-react';
 import { Renew } from '@carbon/icons-react';
+import { Button } from '@carbon/react';
 import { useMemo } from 'react';
 import { api } from '../api';
+import { BudgetTile } from '../components/Budget';
 import { ChartPanel } from '../components/ChartPanel';
+import { HBarList } from '../components/HBarList';
 import { RateNote, usdText } from '../components/Money';
 import { PageHeader } from '../components/PageHeader';
 import { PageError, PageLoading } from '../components/States';
-import { StatCard } from '../components/StatCard';
+import { KpiTile } from '../components/StatCard';
+import { TeamTable } from '../components/TeamTable';
 import { bobcoins, bucketLabel, count, minutes, percent } from '../format';
-import { useApi, useUsdRate } from '../hooks';
-import { LABEL_AXIS, baseOptions, colorScale, countTicks, slot, useDarkMode } from '../theme';
-
-const ACTIVITY = ['Prompts', 'Tool calls', 'Blocks'];
+import { useSummary, useUsdRate } from '../hooks';
+import { baseOptions, countTicks, severityColor, simpleTip, slot, teamColors, tip, useDarkMode, type TipSpec } from '../theme';
 
 export function OverviewPage() {
   const dark = useDarkMode();
-  const state = useApi(api.overview, []);
+  const state = useSummary(api.overview);
   const { rate, fromBrowser } = useUsdRate(state.data?.usd_rate);
   const data = state.data;
 
   const charts = useMemo(() => {
     if (!data) return null;
-    const label = (bucket: string) => bucketLabel(bucket, data.granularity);
-    const buckets = data.activity.map((item) => item.bucket);
-    const order = buckets.map(label);
-    const series = [...data.users, data.ci_label];
-    const spendKeys = new Set(data.bobcoins_by_user.map((item) => item.bucket));
-    const spend = [
-      ...data.bobcoins_by_user.map((item) => ({ group: item.user, key: label(item.bucket), value: item.bobcoins })),
-      ...buckets.filter((bucket) => !spendKeys.has(bucket)).map((bucket) => ({ group: series[0], key: label(bucket), value: 0 })),
-    ];
-    // Bucket order first, then the stable series order, so the legend matches the colors.
-    spend.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key) || series.indexOf(a.group) - series.indexOf(b.group));
-    const activity = data.activity.flatMap((item) => [
-      { group: 'Prompts', key: label(item.bucket), value: item.prompts },
-      { group: 'Tool calls', key: label(item.bucket), value: item.tool_calls },
-      { group: 'Blocks', key: label(item.bucket), value: item.blocks },
-    ]);
-    const merge = data.time_to_merge.map((item) => ({ group: 'Minutes to merge', key: `${item.ticket} · ${item.user}`, value: item.minutes }));
-    const rules = data.violations_by_rule.filter((item) => item.blocked > 0).map((item) => ({ group: 'Blocked', key: item.rule_name || item.rule_id, value: item.blocked }));
-    return { spend, order, activity, merge, rules };
+    const label = (day: string) => bucketLabel(day, data.granularity);
+    const order = data.days.map(label);
+    const teams = [...new Set(data.spend_by_team.map((item) => item.team))];
+    const spend = data.spend_by_team.map((item) => ({ group: item.team, key: label(item.day), value: item.bobcoins, day: item.day }));
+    const active = data.daily_active.map((item) => ({ group: 'Daily active users', key: label(item.day), value: item.people, day: item.day }));
+    const maxMinutes = Math.max(0, ...data.merge_median_per_day.map((item) => item.minutes ?? 0));
+    const hours = maxMinutes > 180;
+    const merge = data.merge_median_per_day.filter((item) => item.minutes != null).map((item) => ({
+      group: 'Median time to merge', key: label(item.day), value: hours ? Math.round((item.minutes as number) / 6) / 10 : item.minutes, day: item.day, merged: item.merged,
+    }));
+    return { order, teams, spend, active, merge, mergeUnit: hours ? 'h' : 'min', label };
   }, [data]);
 
   if (state.loading && !data) return <PageLoading />;
-  if (state.error || !data || !charts) return <PageError error={state.error || new Error('No summary returned')} retry={state.reload} />;
+  if (!data || !charts) return <PageError error={state.error || new Error('No summary returned')} retry={state.reload} />;
   const k = data.kpis;
-  const per = data.granularity === 'hour' ? 'per hour' : 'per day';
+  const days = data.period_days;
+  const colors = teamColors([...data.teams, ...charts.teams], dark);
   const one = (name: string) => ({ scale: { [name]: slot(0, dark) } });
+  const per = data.granularity === 'day' ? 'per day' : data.granularity === 'week' ? 'per week' : 'per month';
+  const spendTip = (day: string | undefined): TipSpec => {
+    const items = data.spend_by_team.filter((item) => item.day === day);
+    const total = items.reduce((sum, item) => sum + item.bobcoins, 0);
+    return {
+      title: day ? charts.label(day) : '',
+      rows: items.map((item) => ({ label: item.team, value: bobcoins(item.bobcoins), sub: rate == null ? undefined : usdText(item.bobcoins, rate) })),
+      total: items.length > 1 ? { label: 'Total', value: bobcoins(total), sub: rate == null ? undefined : usdText(total, rate) } : undefined,
+    };
+  };
+  const teamBars = data.violations_by_team.items.map((item) => ({
+    label: item.team, value: item.blocked, display: count(item.blocked), color: item.other ? '#8d8d8d' : colors[item.team] ?? slot(0, dark),
+    tip: { title: item.team, rows: [{ label: 'Blocked actions', value: count(item.blocked), color: colors[item.team] }] },
+  }));
+  const ruleBars = data.violations_by_rule.items.map((item) => ({
+    label: item.other ? item.rule_id : item.rule_name || item.rule_id, value: item.blocked, display: count(item.blocked),
+    color: item.other ? '#8d8d8d' : severityColor(item.severity, dark),
+    tip: { title: item.rule_name || item.rule_id, rows: [{ label: 'Blocked actions', value: count(item.blocked) }, ...(item.severity ? [{ label: 'Severity', value: item.severity }] : [])] },
+  }));
 
   return (
     <>
-      <PageHeader title="Overview" actions={<Button kind="ghost" size="sm" renderIcon={Renew} onClick={state.reload}>Refresh</Button>} />
-
+      <PageHeader title="Overview" actions={<Button kind="ghost" size="sm" renderIcon={Renew} hasIconOnly iconDescription="Refresh" onClick={state.reload} />} />
       <section className="kpi-grid kpi-grid--four" aria-label="Key numbers">
-        <StatCard label="Bobcoin spend" value={bobcoins(k.bobcoins)} detail={k.bobcoins == null ? undefined : usdText(k.bobcoins, rate)} />
-        <StatCard label="Bobcoins per merged PR" value={bobcoins(k.bobcoins_per_merged_pr)} detail={k.bobcoins_per_merged_pr == null ? undefined : usdText(k.bobcoins_per_merged_pr, rate)} />
-        <StatCard label="PRs merged" value={count(k.prs_merged)} />
-        <StatCard label="Median time to merge" value={minutes(k.median_minutes_to_merge)} />
-        <StatCard label="Violations blocked" value={count(k.blocked)} />
-        <StatCard label="Active people" value={count(k.active_users)} />
-        <StatCard label="Bob sessions" value={count(k.sessions)} />
-        <StatCard label="First-try CI pass rate" value={percent(k.first_try_pass_rate_pct)} />
+        <KpiTile label="Bobcoin spend" kpi={k.bobcoins} format={bobcoins} days={days} detail={k.bobcoins?.value == null ? undefined : usdText(k.bobcoins.value, rate)} />
+        <BudgetTile spent={k.budget_used_bobcoins?.value ?? null} budget={k.budget_total?.value ?? null} pct={k.budget_used_pct?.value ?? null} />
+        <KpiTile label="Bobcoins per merged PR" kpi={k.bobcoins_per_merged_pr} format={bobcoins} better="down" days={days} detail={k.bobcoins_per_merged_pr?.value == null ? undefined : usdText(k.bobcoins_per_merged_pr.value, rate)} />
+        <KpiTile label="PRs merged" kpi={k.prs_merged} format={count} better="up" days={days} />
+        <KpiTile label="Daily active users (avg)" kpi={k.daily_active_people} format={(value) => (value == null ? '—' : value.toFixed(1))} better="up" days={days} />
+        <KpiTile label="Median time to merge" kpi={k.median_minutes_to_merge} format={minutes} better="down" days={days} />
+        <KpiTile label="Violations blocked" kpi={k.blocked} format={count} better="down" days={days} />
+        <KpiTile label="First-try CI pass rate" kpi={k.first_try_pass_rate_pct} format={percent} better="up" days={days} />
       </section>
       <RateNote rate={rate} basis={data.usd_rate_basis} fromBrowser={fromBrowser} />
 
+      <TeamTable rows={data.by_team} rate={rate} />
+
       <section className="chart-grid">
-        <ChartPanel title={`Bobcoins by person, ${per}`} empty={!charts.spend.some((item) => item.value > 0)} emptyDetail="Spend appears after Bob sends a Stop event with a session cost.">
-          <StackedBarChart data={charts.spend} options={{ ...baseOptions(dark), axes: { left: { mapsTo: 'value', stacked: true, title: 'Bobcoins (BC)' }, bottom: { mapsTo: 'key', scaleType: 'labels', domain: charts.order } }, color: { scale: colorScale(data.users, dark, [data.ci_label]) } } as never} />
+        <ChartPanel title="Bobcoin spend by team" empty={!charts.spend.length} emptyDetail="Spend appears after Bob sends a Stop event with a session cost.">
+          <StackedBarChart data={charts.spend} options={{ ...baseOptions(dark), axes: { left: { mapsTo: 'value', stacked: true, title: `Bobcoins (BC) ${per}` }, bottom: { mapsTo: 'key', scaleType: 'labels', domain: charts.order } }, color: { scale: colors }, ...tip(colors, (items) => spendTip(items[0]?.day)) } as never} />
         </ChartPanel>
-        <ChartPanel title={data.granularity === 'hour' ? 'Hourly activity' : 'Daily activity'} empty={!charts.activity.some((item) => item.value > 0)}>
-          <GroupedBarChart data={charts.activity} options={{ ...baseOptions(dark), axes: { bottom: { mapsTo: 'key', scaleType: 'labels', domain: charts.order }, left: { mapsTo: 'value', title: 'Events (count)' } }, color: { scale: colorScale(ACTIVITY, dark) } } as never} />
+        <ChartPanel title="Violations by team" empty={!teamBars.length} emptyDetail="No action was blocked in this period." viewAll={data.violations_by_team.truncated ? { href: '#/violations' } : null}>
+          <HBarList label="Violations by team" items={teamBars} />
         </ChartPanel>
-        <ChartPanel title="Time to merge by ticket" empty={!charts.merge.length} emptyDetail="Bars appear when a ticket has a merge event.">
-          <SimpleBarChart data={charts.merge} options={{ ...baseOptions(dark), axes: { left: { mapsTo: 'key', ...LABEL_AXIS }, bottom: { mapsTo: 'value', title: 'Minutes, start to merge' } }, legend: { enabled: false }, color: one('Minutes to merge') } as never} />
+        <ChartPanel title={data.granularity === 'day' ? 'Daily active users' : `Daily active users (average ${per})`} empty={!charts.active.some((item) => item.value > 0)}>
+          <SimpleBarChart data={charts.active} options={{ ...baseOptions(dark), axes: { bottom: { mapsTo: 'key', scaleType: 'labels', domain: charts.order }, left: { mapsTo: 'value', ...countTicks(Math.max(0, ...charts.active.map((item) => item.value))) } }, legend: { enabled: false }, color: one('Daily active users'), ...simpleTip({ 'Daily active users': slot(0, dark) }, 'Active users', (d) => (d.value ?? 0).toLocaleString('en-US', { maximumFractionDigits: 1 }), (d) => String(d.key ?? '')) } as never} />
         </ChartPanel>
-        <ChartPanel title="Blocks by rule" empty={!charts.rules.length} emptyDetail="No action has been blocked yet.">
-          <SimpleBarChart data={charts.rules} options={{ ...baseOptions(dark), axes: { left: { mapsTo: 'key', ...LABEL_AXIS }, bottom: { mapsTo: 'value', title: 'Blocked actions (count)', ...countTicks(Math.max(0, ...charts.rules.map((item) => item.value))) } }, legend: { enabled: false }, color: one('Blocked') } as never} />
+        <ChartPanel title={`Time to merge, median ${per}`} empty={!charts.merge.length} emptyDetail="Appears when tickets merge in this period.">
+          <SimpleBarChart data={charts.merge} options={{ ...baseOptions(dark), axes: { bottom: { mapsTo: 'key', scaleType: 'labels', domain: charts.order }, left: { mapsTo: 'value', title: charts.mergeUnit === 'h' ? 'Hours' : 'Minutes' } }, legend: { enabled: false }, color: one('Median time to merge'), ...tip({ 'Median time to merge': slot(0, dark) }, (items) => ({ title: String(items[0]?.key ?? ''), rows: [{ label: 'Median time to merge', value: `${items[0]?.value} ${charts.mergeUnit}` }, { label: 'Tickets merged', value: count(items[0]?.merged) }] })) } as never} />
+        </ChartPanel>
+      </section>
+      <section className="chart-grid chart-grid--single">
+        <ChartPanel title="Violations by rule" empty={!ruleBars.length} emptyDetail="No action was blocked in this period." viewAll={data.violations_by_rule.truncated ? { href: '#/violations' } : null}>
+          <HBarList label="Violations by rule" items={ruleBars} />
         </ChartPanel>
       </section>
     </>

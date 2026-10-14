@@ -28,6 +28,8 @@ FIELDS = (
     # Stop events), the edited file path, and lab (GitHub/CI) event data.
     "lab_ticket", "lab_role", "lab_branch", "lab_cost", "lab_path", "lab_kind", "lab_pr", "lab_data",
     "lab_tokens", "lab_turns",
+    # Team (X-Governance-Team) and this server's processing time per hook call.
+    "team", "check_ms", "session_source",
 )
 
 SORT_COLUMNS = {
@@ -385,7 +387,7 @@ def _filtered_events(filters: dict[str, Any]) -> list[dict[str, Any]]:
     mapping = {
         "user": "user_name", "device": "device_name", "profile": "profile_name", "source": "source",
         "decision": "decision", "rule": "rule_id", "severity": "severity", "event": "hook_event", "tool": "tool_name",
-        "ticket": "lab_ticket", "role": "lab_role",
+        "ticket": "lab_ticket", "role": "lab_role", "session": "session_id",
     }
     with _lock:
         rows = list(_events.values())

@@ -11,6 +11,8 @@ export DATA_DIR="${DATA_DIR:-./data}"
 export INGEST_TOKEN="${INGEST_TOKEN:-lab-ingest-token}"
 export DASHBOARD_USER="${DASHBOARD_USER:-governance}"
 export DASHBOARD_PASSWORD="${DASHBOARD_PASSWORD:-lab}"
+DEFAULT_BUDGETS='{"teams":{"Platform":100,"Field Apps":100},"default_person":50,"period":"month"}'
+export LAB_BUDGETS="${LAB_BUDGETS:-$DEFAULT_BUDGETS}"
 
 if [ ! -x .venv/bin/python ]; then
   python3 -m venv .venv

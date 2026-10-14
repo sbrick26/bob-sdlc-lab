@@ -11,6 +11,12 @@ so they carry past timestamps; that is the same path a hook client uses to
 replay events it recorded while offline. Event ids are deterministic, so a
 second run inserts nothing new.
 
+Users sam and priya are on team Platform, jordan and alex on Field Apps
+(X-Governance-Team). A prior week of lighter tickets (KAN-197..200) gives the
+dashboard a previous period to compare against. priya has one long outlier
+session that takes her past 80% of a 50 Bobcoin budget, and jordan has one
+tool call that never returns (a tool failure).
+
 Usage:
   BASE_URL=http://localhost:8080 INGEST_TOKEN=lab-ingest-token python scripts/seed-lab.py
 """
@@ -31,8 +37,11 @@ TOKEN = os.environ.get("INGEST_TOKEN", "lab-ingest-token")
 NAMESPACE = uuid.UUID("5b1f3c2e-8d74-4c0b-9a51-6f0f2d8e7a10")
 NOW = datetime.now(timezone.utc).replace(second=0, microsecond=0)
 # Demo usage per Bob turn: Bobcoins and context tokens, scaled per ticket.
-COIN_PER_TURN = 0.31
-TOKENS_PER_TURN = 18_500
+COIN_PER_TURN = 0.15
+TOKENS_PER_TURN = 4_000
+TEAMS = {"sam": "Platform", "priya": "Platform", "jordan": "Field Apps", "alex": "Field Apps"}
+# Seconds a tool takes before its PostToolUse, scaled per ticket.
+TOOL_SECONDS = {"read_file": 2, "write_file": 4, "apply_diff": 6, "execute_command": 25}
 
 # day = days before today; minutes are offsets from the participant's start time
 PEOPLE: list[dict[str, Any]] = [
@@ -154,6 +163,8 @@ class Run:
             "X-Lab-Role": role,
             "X-Lab-Branch": f"feature/{self.person['ticket'].lower()}",
         }
+        if name in TEAMS:
+            headers["X-Governance-Team"] = TEAMS[name]
         if blocked_rule:
             headers["X-Governance-Local-Rule"] = blocked_rule
         if usage is not None:
@@ -165,17 +176,30 @@ class Run:
         post("/api/v1/hooks", body, headers)
 
     def session(self, name: str) -> str:
-        return f"{name}-{self.person['ticket']}"
+        return f"{name}-{self.person['ticket']}{self.suffix}"
 
-    def turn_end(self, minute: float, *, role: str = "participant", user: str | None = None, turns: int = 1) -> None:
+    suffix = ""
+
+    def turn_end(self, minute: float, *, role: str = "participant", user: str | None = None, turns: int = 1,
+                 coin: float = COIN_PER_TURN, tokens: float = TOKENS_PER_TURN) -> None:
         """Stop event: the session's cumulative Bobcoins, context tokens and turns."""
         name = user or self.person["user"]
         state = self.usage.setdefault(self.session(name), {"cost": 0.0, "tokens": 0.0, "turns": 0.0})
         scale = self.person["scale"]
         state["turns"] += turns
-        state["cost"] += COIN_PER_TURN * turns * scale
-        state["tokens"] += TOKENS_PER_TURN * turns * scale * (1 + state["turns"] / 10)
+        state["cost"] += coin * turns * scale
+        state["tokens"] += tokens * turns * scale * (1 + state["turns"] / 10)
         self.hook(minute, "Stop", role=role, user=user, usage=dict(state), last_assistant_message="Turn complete.")
+
+    def explore(self, minute: float) -> None:
+        """A long exploratory session with a large context: the outlier that pushes its user near the budget."""
+        self.suffix = "-explore"
+        for step in range(8):
+            at = minute + step * 6
+            self.hook(at, "UserPromptSubmit", prompt="Explain how the whole dispatch module works, file by file.")
+            self.tool(at + 1, "read_file", {"path": f"fieldops/module_{step}.py"})
+            self.turn_end(at + 4, turns=6, coin=0.78, tokens=2_400)
+        self.suffix = ""
 
     def lab(self, minute: float, kind: str, *, user: str | None = None, data: dict[str, Any] | None = None) -> None:
         post("/api/v1/lab/events", {
@@ -185,11 +209,12 @@ class Run:
             "occurred_at": stamp(self.start + timedelta(minutes=minute)), "event_id": self._id(),
         })
 
-    def tool(self, minute: float, tool: str, tool_input: dict[str, Any], **extra: Any) -> None:
+    def tool(self, minute: float, tool: str, tool_input: dict[str, Any], *, fail: bool = False, **extra: Any) -> None:
         tool_use = f"{self.person['ticket']}-tool-{self.count}"
         self.hook(minute, "PreToolUse", tool_name=tool, tool_use_id=tool_use, tool_input=tool_input, **extra)
-        if not extra.get("blocked_rule"):
-            self.hook(minute + 0.5, "PostToolUse", tool_name=tool, tool_use_id=tool_use,
+        if not extra.get("blocked_rule") and not fail:
+            seconds = TOOL_SECONDS.get(tool, 5) * self.person["scale"] * (1 + (self.count % 5) / 4)
+            self.hook(minute + seconds / 60, "PostToolUse", tool_name=tool, tool_use_id=tool_use,
                       tool_input=tool_input, tool_response="ok")
 
     def play(self) -> None:
@@ -213,12 +238,16 @@ class Run:
         self.tool(36, "apply_diff", {"path": code_file, "diff": "+# approved approach\n"})
         self.tool(44, "write_file", {"path": test_file, "content": "def test_ticket():\n    assert True\n"})
         self.tool(52, "execute_command", {"command": "python -m pytest -q"})
+        if p.get("failed_tool"):
+            # The end-to-end run never returns: a PreToolUse with no PostToolUse.
+            self.tool(53, "execute_command", {"command": "npm run e2e"}, fail=True)
         self.turn_end(55, turns=4)
         self.hook(60, "UserPromptSubmit", prompt="Run the PR checklist and open the pull request.")
         self.tool(66, "execute_command", {"command": f"git push origin feature/{ticket.lower()}"})
         self.turn_end(70, turns=2)
-        self.lab(72, "pr_opened")
-        minute = 74
+        pr_minute = 72 + p.get("pr_delay", 0)
+        self.lab(pr_minute, "pr_opened")
+        minute = pr_minute + 2
         for index, result in enumerate(p["ci"]):
             self.hook(minute, "UserPromptSubmit", role="ci-reviewer", user="ci-reviewer",
                       prompt=f"Review PR #{p['pr']} against the checklist")
@@ -230,6 +259,8 @@ class Run:
                 self.tool(minute + 16, "execute_command", {"command": "python -m pytest -q"})
                 self.turn_end(minute + 18, turns=3)
             minute += 24 if index == 0 and len(p["ci"]) > 1 else 0
+        if p.get("explore"):
+            self.explore(p["explore"])
         merge = p["merge_after"]
         if merge is None:
             return
@@ -239,8 +270,21 @@ class Run:
         self.lab(merge + 1, "ticket_done")
 
 
+# The week before: the same four users on lighter tickets, so the prior period has data.
+PRIOR_WEEK: list[dict[str, Any]] = [
+    {**person, "ticket": f"KAN-{197 + index}", "pr": 7 + index, "day": person["day"] + 8,
+     "scale": round(person["scale"] * 0.9, 2), "merge_after": 150 + index * 10,
+     "failed_tool": False, "explore": None}
+    for index, person in enumerate(PEOPLE[:4])
+]
+for person, delay in zip(PEOPLE, (0, 18, 6, 25, 3, 12, 30, 9)):
+    person["pr_delay"] = delay
+PEOPLE[5]["explore"] = 30       # priya, KAN-206: one long session, over 80% of her 50 Bobcoin budget
+PEOPLE[6]["failed_tool"] = True  # jordan, KAN-207: one tool call that never returns
+
+
 def main() -> int:
-    for person in PEOPLE:
+    for person in PRIOR_WEEK + PEOPLE:
         Run(person).play()
         print(f"seeded {person['ticket']} for {person['user']}")
     return 0

@@ -12,7 +12,8 @@ os.environ.setdefault("DASHBOARD_PASSWORD", "test-dashboard-password")
 
 from fastapi.testclient import TestClient
 
-from app import db, metrics
+from app import db, metrics, summaries
+from app.summaries import Scope
 from app.main import app, redact
 from app.policies import POLICY_VERSION, RULES, default_policy_config
 
@@ -65,19 +66,17 @@ def test_usage_takes_the_max_per_session_then_sums_per_user_ticket_and_day():
     ]
     deltas = metrics.usage_deltas(rows)
     assert sum(record["bobcoins"] for record in deltas) == 4.75
-    usage = metrics.usage_summary(rows)
-    sam = next(person for person in usage["people"] if person["user"] == "sam")
+    cost = summaries.cost(rows, Scope())
+    sam = next(person for person in cost["people"] if person["user"] == "sam")
     assert sam["bobcoins"] == 4.0
     assert sam["tokens"] == 6000
     assert sam["turns"] == 8
-    assert sam["sessions"] == 2
-    overview = metrics.overview_summary(rows)
-    assert overview["kpis"]["bobcoins"] == 4.75
-    assert overview["kpis"]["tokens"] == 6500
-    by_day = {(item["bucket"], item["user"]): item["bobcoins"] for item in overview["bobcoins_by_user"]}
-    assert by_day == {("2026-01-01", "sam"): 4.0, ("2026-01-02", "priya"): 0.75}
+    overview = summaries.overview(rows, Scope())
+    assert overview["kpis"]["bobcoins"]["value"] == 4.75
+    by_day = {item["day"]: item["bobcoins"] for item in overview["spend_by_team"]}
+    assert by_day == {"2026-01-01": 4.0, "2026-01-02": 0.75}
     assert metrics.bobcoins_by_ticket(rows) == {"T-1": 4.0, "T-2": 0.75}
-    assert usage["bobcoins_over_time"][-1]["bobcoins"] == 4.75
+    assert sum(day["total"] for day in cost["daily"]) == 4.75
 
 
 def test_non_stop_costs_count_as_sent():
@@ -101,52 +100,53 @@ def test_stop_headers_are_stored_and_aggregated_through_the_hook(monkeypatch):
     hook("Stop", user, ticket, session="ana-1", extra_headers={"X-Lab-Cost": "junk", "X-Lab-Tokens": "-4"})
     event = client.get(f"/api/v1/events/{first.json()['event_id']}", auth=AUTH).json()["event"]
     assert (event["lab_cost"], event["lab_tokens"], event["lab_turns"]) == (1.2, 15000, 3)
-    usage = client.get("/api/v1/usage/summary", auth=AUTH).json()
-    ana = next(person for person in usage["people"] if person["user"] == user)
+    cost = client.get("/api/v1/cost/summary", auth=AUTH).json()
+    ana = next(person for person in cost["people"] if person["user"] == user)
     assert ana["bobcoins"] == 3.87
     assert ana["tokens"] == 42000
     assert ana["turns"] == 7
     assert ana["sessions"] == 1
-    assert ana["prompts"] == 1
     # Default rate: IBM enterprise packs, $500 per 1,000 Bobcoins.
-    assert usage["usd_rate"] == 0.5
-    assert "enterprise pack" in usage["usd_rate_basis"]
+    assert cost["usd_rate"] == 0.5
+    assert "enterprise pack" in cost["usd_rate_basis"]
     assert ana["usd"] == 1.94
-    ticket_row = next(item for item in usage["tickets"] if item["ticket"] == ticket)
+    tickets = client.get("/api/v1/delivery/summary", auth=AUTH).json()["tickets"]
+    ticket_row = next(item for item in tickets if item["ticket"] == ticket)
     assert ticket_row["bobcoins"] == 3.87 and ticket_row["usd"] == 1.94
 
 
 def test_usd_is_null_without_a_rate_and_follows_the_configured_rate(monkeypatch):
     rows = [stop("10:00", "a", cost=3.87)]
     monkeypatch.delenv("BOBCOIN_USD_RATE", raising=False)
-    assert metrics.usage_summary(rows)["people"][0]["usd"] == 1.94
-    assert metrics.overview_summary(rows)["kpis"]["usd"] == 1.94
+    assert summaries.cost(rows, Scope())["people"][0]["usd"] == 1.94
+    assert summaries.overview(rows, Scope())["kpis"]["usd"]["value"] == 1.94
     monkeypatch.setenv("BOBCOIN_USD_RATE", "off")
-    usage = metrics.usage_summary(rows)
-    assert usage["usd_rate"] is None and usage["usd_rate_basis"] is None
-    assert usage["people"][0]["usd"] is None
-    assert usage["roi"]["usd_total"] is None
-    assert metrics.overview_summary(rows)["kpis"]["usd"] is None
+    cost = summaries.cost(rows, Scope())
+    assert cost["usd_rate"] is None and cost["usd_rate_basis"] is None
+    assert cost["people"][0]["usd"] is None
+    assert summaries.overview(rows, Scope())["kpis"]["usd"]["value"] is None
     monkeypatch.setenv("BOBCOIN_USD_RATE", "0.55")
-    usage = metrics.usage_summary(rows)
-    assert usage["usd_rate"] == 0.55
-    assert usage["people"][0]["usd"] == 2.13
-    assert usage["usd_rate_basis"] == "BOBCOIN_USD_RATE setting"
+    cost = summaries.cost(rows, Scope())
+    assert cost["usd_rate"] == 0.55
+    assert cost["people"][0]["usd"] == 2.13
+    assert cost["usd_rate_basis"] == "BOBCOIN_USD_RATE setting"
 
 
 def test_empty_data_has_no_nan_and_null_metrics():
+    scope = Scope.parse("2026-01-01", "2026-01-07", None, 0)
     for payload in (
-        metrics.overview_summary([]), metrics.usage_summary([]), metrics.violations_summary([]),
-        metrics.rules_summary([], RULES, {}),
+        summaries.overview([], scope), summaries.cost([], scope), summaries.delivery([], scope),
+        summaries.performance([], scope), summaries.violations([], scope), summaries.rules([], scope, RULES, {}),
     ):
         assert all(math.isfinite(value) for value in walk_numbers(payload))
         json.dumps(payload, allow_nan=False)
-    overview = metrics.overview_summary([])
-    assert overview["kpis"]["bobcoins"] is None
-    assert overview["kpis"]["median_minutes_to_merge"] is None
-    assert overview["kpis"]["bobcoins_per_merged_pr"] is None
-    assert overview["activity"] == [] and overview["bobcoins_by_user"] == []
-    assert metrics.usage_summary([])["roi"]["first_try_pass_rate_pct"] is None
+    overview = summaries.overview([], scope)
+    assert overview["kpis"]["bobcoins"]["value"] is None
+    assert overview["kpis"]["median_minutes_to_merge"]["value"] is None
+    assert overview["kpis"]["bobcoins_per_merged_pr"]["value"] is None
+    assert overview["kpis"]["bobcoins"]["delta_pct"] is None
+    assert overview["spend_by_team"] == []
+    assert summaries.cost([], scope)["outliers"] == []
 
 
 def test_control_points_and_masked_excerpts():
@@ -168,7 +168,7 @@ def test_control_points_and_masked_excerpts():
     assert "AbCd****" in token and "567890" not in token
 
 
-def test_violations_summary_breaks_down_blocks_by_control_point():
+def test_violations_summary_breaks_down_blocks():
     user, ticket = "viol-kim", "VIO-401"
     secret = "sk-abcdefghijklmnopqrstuvwxyz1234567890"
     hook("UserPromptSubmit", user, ticket, prompt=f"Use {secret} for the call")
@@ -183,9 +183,11 @@ def test_violations_summary_breaks_down_blocks_by_control_point():
     assert {row["control_point"] for row in mine} == {"Prompt submit", "Tool call", "File write", "Git command"}
     assert all(row["decision"] == "blocked" and len(row["excerpt"]) <= 80 for row in mine)
     assert not any(secret in row["excerpt"] or "0199" in row["excerpt"] for row in mine)
-    points = {item["control_point"]: item["blocked"] for item in summary["by_control_point"]}
-    assert all(points[name] >= 1 for name in ("Prompt submit", "Tool call", "File write", "Git command"))
-    assert any(item["user"] == user and item["blocked"] == 4 for item in summary["by_user"])
+    assert "by_control_point" not in summary
+    assert any(item["user"] == user and item["blocked"] == 4 for item in summary["by_user"]["items"])
+    # 4 actions is below the 20-action minimum: not ranked, but counted.
+    assert not any(item["user"] == user for item in summary["block_rate_by_user"]["items"])
+    assert summary["block_rate_by_user"]["unranked"] >= 1
     rules = client.get("/api/v1/rules/summary", auth=AUTH).json()["rules"]
     assert [rule["rule_id"] for rule in rules] == list(RULES)
     git = next(rule for rule in rules if rule["rule_id"] == "GOV-GIT-001")
@@ -225,39 +227,27 @@ def test_events_date_range_filter():
     assert client.get(f"/api/v1/events?user={user}&until=2000-01-01", auth=AUTH).json()["count"] == 0
 
 
-def test_overview_summary_endpoint_shape():
-    overview = client.get("/api/v1/overview/summary", auth=AUTH).json()
-    assert set(overview["kpis"]) >= {
-        "active_users", "sessions", "prompts", "bobcoins", "usd", "tokens", "blocked", "prs_merged",
-        "median_minutes_to_merge", "bobcoins_per_merged_pr", "usd_per_merged_pr",
-    }
-    assert overview["granularity"] in {"hour", "day"}
-    assert client.get("/api/v1/overview/summary").status_code == 401
-
-
-def test_ci_reviewer_is_automation_not_a_person():
+def test_ci_reviewer_is_automation_not_a_user():
     reviewer = {**stop("12:00", "ci", cost=2.0, tokens=900, turns=2, user="ci-reviewer"), "lab_role": "ci-reviewer"}
     rows = [stop("10:00", "a", cost=3.0, tokens=1000, turns=3), reviewer]
-    usage = metrics.usage_summary(rows)
-    assert [person["user"] for person in usage["people"]] == ["sam"]
-    assert usage["automation"]["label"] == "Automated review (CI)"
-    assert usage["automation"]["bobcoins"] == 2.0 and usage["automation"]["sessions"] == 1
-    assert usage["roi"]["bobcoins_total"] == 5.0
+    cost = summaries.cost(rows, Scope())
+    assert [person["user"] for person in cost["people"]] == ["sam"]
+    assert cost["automation"]["label"] == "Automated review (CI)"
+    assert cost["automation"]["bobcoins"] == 2.0
     assert metrics.bobcoins_by_ticket(rows) == {"T-1": 5.0}
-    overview = metrics.overview_summary(rows)
-    assert overview["users"] == ["sam"]
-    assert overview["kpis"]["active_users"] == 1 and overview["kpis"]["sessions"] == 1
-    assert {item["user"] for item in overview["bobcoins_by_user"]} == {"sam", "Automated review (CI)"}
-    assert overview["kpis"]["bobcoins"] == 5.0
+    overview = summaries.overview(rows, Scope())
+    assert overview["kpis"]["active_people"]["value"] == 1
+    assert overview["kpis"]["bobcoins"]["value"] == 5.0
 
 
-def test_day_buckets_follow_the_viewer_time_zone():
+def test_days_follow_the_viewer_time_zone():
     rows = [stop("02:00", "a", cost=1.0, day="2026-01-02"), stop("10:00", "b", cost=1.0, day="2026-01-01")]
-    utc = {item["bucket"] for item in metrics.overview_summary(rows)["bobcoins_by_user"]}
+    utc = {item["day"] for item in summaries.overview(rows, Scope())["spend_by_team"]}
     assert utc == {"2026-01-01", "2026-01-02"}
-    # UTC-5 (getTimezoneOffset 300): 02:00 UTC on Jan 2 is 21:00 on Jan 1, so both land on Jan 1.
-    local = metrics.overview_summary(rows, tz_offset=300)
-    assert local["granularity"] == "hour"
-    assert all(item["bucket"].startswith("2026-01-01T") for item in local["bobcoins_by_user"])
+    # UTC-5 (getTimezoneOffset 300): 02:00 UTC on Jan 2 is 21:00 on Jan 1.
+    local = {item["day"] for item in summaries.overview(rows, Scope(tz_offset=300))["spend_by_team"]}
+    assert local == {"2026-01-01"}
     assert client.get("/api/v1/overview/summary?tz_offset=300", auth=AUTH).status_code == 200
     assert client.get("/api/v1/violations/summary?tz_offset=9999", auth=AUTH).status_code == 422
+    assert client.get("/api/v1/overview/summary?since=2026-02-02&until=2026-02-01", auth=AUTH).status_code == 422
+    assert client.get("/api/v1/overview/summary").status_code == 401

@@ -17,7 +17,7 @@ from pathlib import PurePath
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -26,6 +26,9 @@ from . import db
 from . import lab
 from . import mdm
 from . import metrics
+from . import summaries
+from . import detail
+from .stream import HEARTBEAT_SECONDS, broker, event_message
 from .policies import PACKAGE_ALLOWLIST, POLICY_VERSION, RULES, default_policy_config, prompt_rule_id, rule
 from .profile import build_profile
 from .storage import ObjectStoreUnavailable
@@ -57,7 +60,9 @@ if os.path.isdir(FRONTEND_DIST / "assets"):
 @app.middleware("http")
 async def protect_governance_responses(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/api/"):
+    if request.url.path == "/api/v1/stream":
+        response.headers["Cache-Control"] = "no-cache, no-transform"
+    elif request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Pragma"] = "no-cache"
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -177,6 +182,8 @@ def clean_event(body: dict[str, Any], *, allow_content: bool = False) -> dict[st
             event[field] = None if value is None else min(max(int(value), 0), 10_000_000)
         elif field == "lab_cost":
             event[field] = None if value is None else float(value)
+        elif field == "check_ms":
+            event[field] = None if value is None else round(min(max(float(value), 0.0), 60_000.0), 3)
         elif field in {"lab_tokens", "lab_turns"}:
             event[field] = None if value is None else min(max(int(value), 0), 10**12)
         elif field in {"prompt_content", "tool_input_content", "tool_output_content", "response_content"}:
@@ -213,6 +220,19 @@ def redact(value: Any) -> tuple[str, list[str]]:
     for index, reference in enumerate(managed_references):
         text = text.replace(f"<MANAGED_REFERENCE_{index}>", reference)
     return text[:MAX_CONTENT], sorted(set(hits))
+
+
+STORED_TOKEN = re.compile(r"(?<![A-Za-z0-9])(?=[A-Za-z0-9_+=-]*\d)(?=[A-Za-z0-9_+=-]*[A-Za-z])[A-Za-z0-9_+=-]{24,}(?![A-Za-z0-9])")
+STORED_PHONE = re.compile(r"\b\d{3}-\d{3}-\d{4}\b")
+
+
+def mask_stored(text: str, phones: bool = True) -> str:
+    """Mask long token-like strings and (optionally) US phone numbers, keeping their length."""
+    if not text:
+        return text
+    marker = lambda match: f"[masked {len(match.group(0))} chars]"  # noqa: E731
+    text = STORED_TOKEN.sub(marker, text)
+    return STORED_PHONE.sub(marker, text) if phones else text
 
 
 def bucket(length: int) -> str:
@@ -543,6 +563,7 @@ async def ingest_hook(
     x_lab_cost: str | None = Header(None, alias="X-Lab-Cost"),
     x_lab_tokens: str | None = Header(None, alias="X-Lab-Tokens"),
     x_lab_turns: str | None = Header(None, alias="X-Lab-Turns"),
+    x_governance_team: str | None = Header(None, alias="X-Governance-Team"),
 ) -> dict[str, Any]:
     """Receive Bob's native hook envelope, decide centrally, and store a redacted record."""
     started = time.perf_counter_ns()
@@ -566,6 +587,14 @@ async def ingest_hook(
     tool_input_text, input_hits = redact(tool_input_raw)
     tool_output_text, output_hits = redact(tool_output_raw)
     response_text, response_hits = redact(response_raw)
+    # Stored content is masked a second time at ingest: long token-like strings
+    # and US phone numbers (not in files under data/ or tests/) become
+    # "[masked N chars]", so the object store never holds them.
+    input_path = tool_input_path(tool_input_raw)
+    prompt_text = mask_stored(prompt_text)
+    tool_input_text = mask_stored(tool_input_text, phones=not path_is_exempt_for_pii(input_path))
+    tool_output_text = mask_stored(tool_output_text, phones=not path_is_exempt_for_pii(input_path))
+    response_text = mask_stored(response_text)
     active_rules = runtime_rules()
     package_configuration = active_rules.get("GOV-PKG-001", {}).get("configuration", {})
     package_ecosystem, unapproved_packages = package_install_findings(
@@ -723,12 +752,45 @@ async def ingest_hook(
         "lab_cost": lab_cost(x_lab_cost),
         "lab_tokens": lab_count(x_lab_tokens, 10**12),
         "lab_turns": lab_count(x_lab_turns, 1_000_000),
+        "team": safe_header(x_governance_team, summaries.TEAM_DEFAULT),
         "lab_path": tool_input_path(tool_input_raw),
+        "session_source": safe_header(str(payload.get("source") or ""), "")[:40] or None if hook_event == "SessionStart" else None,
     }
-    db.insert_event(clean_event(event, allow_content=True))
+    # Governance check time: this server's own processing of the hook call,
+    # measured for every call (a deferred event keeps duration_ms empty because
+    # its decision was made on the endpoint).
+    event["check_ms"] = round((time.perf_counter_ns() - started) / 1_000_000, 3)
+    if db.insert_event(clean_event(event, allow_content=True)):
+        broker.publish(event_message(event))
     if db.storage_health().get("status") == "degraded":
         raise HTTPException(503, "Durable event storage is temporarily unavailable; retry is required.")
     return {"decision": decision, "reason": reason, "context": context, "event_id": event["event_id"]}
+
+
+CONTENT_FIELDS = {"prompt_content", "tool_input_content", "tool_output_content", "response_content", "content_ref"}
+
+
+def _scope(since: str | None, until: str | None, team: str | None, tz_offset: int | None) -> summaries.Scope:
+    try:
+        return summaries.Scope.parse(since, until, team, tz_offset or 0)
+    except ValueError as exc:
+        raise HTTPException(422, "since and until must be dates (YYYY-MM-DD), since first") from exc
+
+
+def _audit_rows(filters: dict[str, Any], team: str | None, tz_offset: int | None) -> list[dict[str, Any]]:
+    """Filtered events with `team` attached. With tz_offset, date bounds are the viewer's local days."""
+    filters = dict(filters)
+    if tz_offset is not None and (filters.get("since") or filters.get("until")):
+        start, end = _scope(filters.get("since"), filters.get("until"), None, tz_offset).utc_bounds()
+        filters["since"] = start
+        filters["until"] = None
+        rows = [row for row in db.filtered_events(filters) if not end or str(row.get("occurred_at") or "") < end]
+    else:
+        rows = db.filtered_events(filters)
+    teams = summaries.team_map(db.all_events())
+    for row in rows:
+        row["team"] = teams.get(str(row.get("event_id")), summaries.TEAM_DEFAULT)
+    return [row for row in rows if not team or row["team"] == team]
 
 
 @app.get("/api/v1/events", dependencies=[Depends(require_dashboard)])
@@ -736,25 +798,37 @@ def events(
     user: str | None = None, device: str | None = None, profile: str | None = None,
     source: str | None = None, decision: str | None = None, rule: str | None = None,
     severity: str | None = None, event: str | None = None, tool: str | None = None,
-    ticket: str | None = None, role: str | None = None,
-    since: str | None = None, until: str | None = None,
+    ticket: str | None = None, role: str | None = None, team: str | None = None, session: str | None = None,
+    since: str | None = None, until: str | None = None, tz_offset: int | None = Query(None, ge=-840, le=840),
     q: str | None = None, limit: int = Query(250, ge=1, le=1000),
     sort: str = "time", direction: str = "desc",
 ) -> dict[str, Any]:
-    filters = locals().copy()
-    rows = db.query_events(filters, limit=limit, sort=sort, direction=direction)
+    filters = {
+        "user": user, "device": device, "profile": profile, "source": source, "decision": decision, "rule": rule,
+        "severity": severity, "event": event, "tool": tool, "ticket": ticket, "role": role,
+        "session": session, "since": since, "until": until, "q": q,
+    }
+    rows = _audit_rows(filters, team, tz_offset)
+    column = db.SORT_COLUMNS.get(sort, "occurred_at") if sort != "team" else "team"
+    rows.sort(key=lambda row: (row.get(column) is not None, row.get(column) or ""), reverse=direction.lower() != "asc")
+    rows = [{key: value for key, value in row.items() if key not in CONTENT_FIELDS} for row in rows[:limit]]
     return {"count": len(rows), "events": rows}
+
+
+def _export_filters(user, ticket, event, decision, since, until, session=None) -> dict[str, Any]:
+    return {"user": user, "ticket": ticket, "event": event, "decision": decision, "since": since, "until": until, "session": session}
 
 
 @app.get("/api/v1/events.csv", dependencies=[Depends(require_dashboard)])
 def events_csv(
     user: str | None = None, ticket: str | None = None, event: str | None = None,
     decision: str | None = None, since: str | None = None, until: str | None = None,
+    team: str | None = None, session: str | None = None, tz_offset: int | None = Query(None, ge=-840, le=840),
 ) -> Response:
     """Audit log export: metadata columns only, detail redacted and masked, no content."""
-    filters = {"user": user, "ticket": ticket, "event": event, "decision": decision, "since": since, "until": until}
+    rows = _audit_rows(_export_filters(user, ticket, event, decision, since, until, session), team, tz_offset)
     buffer = io.StringIO()
-    csv.writer(buffer).writerows(metrics.csv_rows(db.filtered_events(filters), redact))
+    csv.writer(buffer).writerows(metrics.csv_rows(rows, redact))
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
     return Response(
         buffer.getvalue(), media_type="text/csv; charset=utf-8",
@@ -762,19 +836,63 @@ def events_csv(
     )
 
 
+@app.get("/api/v1/events.jsonl", dependencies=[Depends(require_dashboard)])
+def events_jsonl(
+    user: str | None = None, ticket: str | None = None, event: str | None = None,
+    decision: str | None = None, since: str | None = None, until: str | None = None,
+    team: str | None = None, session: str | None = None, tz_offset: int | None = Query(None, ge=-840, le=840),
+) -> Response:
+    """Audit log export as JSON Lines: same columns and redaction as the CSV."""
+    rows = _audit_rows(_export_filters(user, ticket, event, decision, since, until, session), team, tz_offset)
+    body = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in metrics.export_records(rows, redact))
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
+    return Response(
+        body, media_type="application/x-ndjson; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="governance-audit-{stamp}.jsonl"'},
+    )
+
+
+def _tool_run_ms(event: dict[str, Any]) -> float | None:
+    """Tool run time for a PostToolUse: measured, else from the paired PreToolUse timestamp."""
+    if event.get("hook_event") != "PostToolUse":
+        return None
+    if event.get("tool_duration_ms") is not None:
+        return float(event["tool_duration_ms"])
+    if not event.get("tool_use_id"):
+        return None
+    end = lab._parse(event.get("occurred_at"))
+    starts = [
+        lab._parse(row.get("occurred_at")) for row in db.all_events()
+        if row.get("hook_event") == "PreToolUse" and row.get("tool_use_id") == event["tool_use_id"]
+    ]
+    starts = [start for start in starts if start and end and start <= end]
+    return round((end - max(starts)).total_seconds() * 1000, 1) if starts else None
+
+
 @app.get("/api/v1/events/{event_id}", dependencies=[Depends(require_dashboard)])
-def event_detail(event_id: str) -> dict[str, Any]:
+def event_detail(event_id: str, tz_offset: int = Query(0, ge=-840, le=840)) -> dict[str, Any]:
+    """One event, hydrated and redacted, plus a plain-language view for the drawer.
+
+    Fields without a value are left out of both.
+    """
     if not re.fullmatch(r"[0-9a-fA-F-]{36}", event_id):
         raise HTTPException(404, "event not found")
     event = db.get_event(event_id.lower())
     if not event:
         raise HTTPException(404, "event not found")
-    return {"event": event}
+    check = event.get("duration_ms") if event.get("duration_ms") is not None else event.get("check_ms")
+    event["check_ms"] = check
+    event["tool_run_ms"] = _tool_run_ms(event)
+    event["team"] = summaries.team_map(db.all_events()).get(str(event.get("event_id")), event.get("team"))
+    cleaned = {key: value for key, value in event.items() if value not in (None, "", [], {})}
+    return {"event": cleaned, "view": detail.build(cleaned, RULES.get(str(cleaned.get("rule_id") or "")), tz_offset, redact)}
 
 
 @app.get("/api/v1/facets", dependencies=[Depends(require_dashboard)])
 def facets() -> dict[str, list[str]]:
-    return db.facets()
+    result = db.facets()
+    result["teams"] = sorted(set(summaries.team_map(db.all_events()).values()))
+    return result
 
 
 @app.get("/api/v1/summary", dependencies=[Depends(require_dashboard)])
@@ -1024,6 +1142,32 @@ def _lab_number(data: dict[str, Any], key: str, kind: type) -> Any:
     return number
 
 
+def _lab_text(value: Any, limit: int = 200) -> str | None:
+    if value is None:
+        return None
+    text = mask_stored(redact(str(value))[0]).strip()[:limit]
+    if not SAFE_TEXT.match(text):
+        raise HTTPException(422, "invalid text in lab event data")
+    return text or None
+
+
+def _lab_url(value: Any) -> str | None:
+    if not value:
+        return None
+    text = str(value).strip()
+    if not re.fullmatch(r"https://[A-Za-z0-9.-]+(?::\d+)?(?:/[A-Za-z0-9._~%/+#?&=:-]*)?", text) or len(text) > 400:
+        raise HTTPException(422, "URLs must be https links")
+    return text
+
+
+def _lab_lines(value: Any) -> list[str] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise HTTPException(422, "findings_list must be a list of strings")
+    return [line for line in (_lab_text(item) for item in value[:20]) if line]
+
+
 def clean_lab_data(kind: str, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the data object of a lab event. Values stay short and scalar."""
     reject_sensitive_shape(data)
@@ -1040,6 +1184,11 @@ def clean_lab_data(kind: str, data: dict[str, Any]) -> dict[str, Any]:
             "findings": _lab_number(data, "findings", int),
             "blocking": _lab_number(data, "blocking", int),
             "seconds": _lab_number(data, "seconds", float),
+            "criteria_met": _lab_number(data, "criteria_met", int),
+            "criteria_total": _lab_number(data, "criteria_total", int),
+            "findings_list": _lab_lines(data.get("findings_list")),
+            "pr_url": _lab_url(data.get("pr_url")),
+            "run_url": _lab_url(data.get("run_url")),
         }
     if kind == "merged":
         approver = data.get("approver")
@@ -1047,13 +1196,19 @@ def clean_lab_data(kind: str, data: dict[str, Any]) -> dict[str, Any]:
             "approver": safe_header(str(approver), "") or None if approver is not None else None,
             "review_rounds": _lab_number(data, "review_rounds", int),
             "lines_changed": _lab_number(data, "lines_changed", int),
+            "title": _lab_text(data.get("title")),
+            "pr_url": _lab_url(data.get("pr_url")),
         }
     cleaned: dict[str, Any] = {}
     for key, value in list(data.items())[:20]:
         name = re.sub(r"[^A-Za-z0-9_]", "", str(key))[:40]
         if not name:
             continue
-        if isinstance(value, (bool, int, float)) or value is None:
+        if name == "pr_url":
+            cleaned[name] = _lab_url(value)
+        elif name == "title":
+            cleaned[name] = _lab_text(value)
+        elif isinstance(value, (bool, int, float)) or value is None:
             cleaned[name] = value
         else:
             text = str(value)
@@ -1106,6 +1261,8 @@ def ingest_lab_event(body: LabEvent) -> dict[str, Any]:
         "lab_data": data,
     }
     inserted = db.insert_event(clean_event(event, allow_content=True))
+    if inserted:
+        broker.publish(event_message(event))
     return {"ok": True, "event_id": event_id, "inserted": inserted}
 
 
@@ -1120,24 +1277,79 @@ def lab_roi(baseline_minutes: float = Query(240, gt=0, le=100_000)) -> dict[str,
     return lab.lab_roi(db.all_events(), baseline_minutes=baseline_minutes)
 
 
+def _summary_scope(
+    since: str | None = None, until: str | None = None, team: str | None = None,
+    tz_offset: int = Query(0, ge=-840, le=840),
+) -> summaries.Scope:
+    return _scope(since, until, team, tz_offset)
+
+
 @app.get("/api/v1/overview/summary", dependencies=[Depends(require_dashboard)])
-def overview_summary(tz_offset: int = Query(0, ge=-840, le=840)) -> dict[str, Any]:
-    return metrics.overview_summary(db.all_events(), tz_offset=tz_offset)
+def overview_summary(scope: summaries.Scope = Depends(_summary_scope)) -> dict[str, Any]:
+    return summaries.overview(db.all_events(), scope)
+
+
+@app.get("/api/v1/cost/summary", dependencies=[Depends(require_dashboard)])
+def cost_summary(scope: summaries.Scope = Depends(_summary_scope)) -> dict[str, Any]:
+    return summaries.cost(db.all_events(), scope)
+
+
+@app.get("/api/v1/delivery/summary", dependencies=[Depends(require_dashboard)])
+def delivery_summary(scope: summaries.Scope = Depends(_summary_scope)) -> dict[str, Any]:
+    return summaries.delivery(db.all_events(), scope)
+
+
+@app.get("/api/v1/performance/summary", dependencies=[Depends(require_dashboard)])
+def performance_summary(scope: summaries.Scope = Depends(_summary_scope)) -> dict[str, Any]:
+    return summaries.performance(db.all_events(), scope)
 
 
 @app.get("/api/v1/violations/summary", dependencies=[Depends(require_dashboard)])
 def violations_summary(
-    limit: int = Query(500, ge=1, le=2000), tz_offset: int = Query(0, ge=-840, le=840),
+    scope: summaries.Scope = Depends(_summary_scope), limit: int = Query(500, ge=1, le=2000),
 ) -> dict[str, Any]:
-    return metrics.violations_summary(db.all_events(), redact, limit=limit, tz_offset=tz_offset)
+    return summaries.violations(db.all_events(), scope, redact, limit=limit)
 
 
-@app.get("/api/v1/usage/summary", dependencies=[Depends(require_dashboard)])
-def usage_summary() -> dict[str, Any]:
-    return metrics.usage_summary(db.all_events())
+@app.get("/api/v1/sessions/{session_id}", dependencies=[Depends(require_dashboard)])
+def session_detail(session_id: str, tz_offset: int = Query(0, ge=-840, le=840)) -> dict[str, Any]:
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", session_id):
+        raise HTTPException(404, "session not found")
+    result = summaries.session_summary(db.all_events(), session_id, tz_offset)
+    if not result:
+        raise HTTPException(404, "session not found")
+    return result
 
 
 @app.get("/api/v1/rules/summary", dependencies=[Depends(require_dashboard)])
-def rules_summary() -> dict[str, Any]:
+def rules_summary(scope: summaries.Scope = Depends(_summary_scope)) -> dict[str, Any]:
     enabled = {rule_id: bool(entry.get("enabled", True)) for rule_id, entry in runtime_rules().items()}
-    return metrics.rules_summary(db.all_events(), RULES, enabled)
+    return summaries.rules(db.all_events(), scope, RULES, enabled)
+
+
+@app.get("/api/v1/stream", dependencies=[Depends(require_dashboard)])
+async def stream(request: Request, once: bool = False) -> StreamingResponse:
+    """Server-Sent Events: one `data:` line per ingested event, a heartbeat comment every 15 s.
+
+    `once=1` sends the recent backlog and closes (used by tests and health checks).
+    """
+    async def events():
+        yield "retry: 5000\n\n"
+        if once:
+            for message in list(broker.recent):
+                yield f"data: {json.dumps(message)}\n\n"
+            return
+        entry = broker.subscribe()
+        try:
+            while not await request.is_disconnected():
+                try:
+                    message = await asyncio.wait_for(entry[1].get(), timeout=HEARTBEAT_SECONDS)
+                    yield f"data: {json.dumps(message)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+        finally:
+            broker.unsubscribe(entry)
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "Connection": "keep-alive",
+    })

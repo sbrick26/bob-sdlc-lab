@@ -26,18 +26,42 @@ This folder is the Bob SDLC lab dashboard. It is the Bob Governance service
   `GOV-GIT-001` blocks unsafe git commands.
 - **`LAB_MODE=1`**: policy publish activates the policy in the object store
   without MDM. Dashboard basic auth still applies.
-- **Console pages**: Overview, Violations, Audit log, Usage & ROI, Rules
-  (read only). Each page reads one summary endpoint:
-  `/api/v1/overview/summary`, `/api/v1/violations/summary`,
-  `/api/v1/usage/summary`, `/api/v1/rules/summary`. The audit log exports
-  `/api/v1/events.csv` (same filters as `/api/v1/events` plus `since` and
-  `until`; metadata columns only, detail redacted). The policy draft and
-  publish API stays, but the console no longer links it.
+- **Console pages**: Overview, Cost & budgets, Delivery, Performance,
+  Violations (with a Rules tab) and Audit log. Each reads one summary
+  endpoint (`/api/v1/{overview,cost,delivery,performance,violations,rules}/summary`)
+  that takes `since`, `until` (local dates), `team` and `tz_offset`. KPI deltas
+  compare with the prior period of the same length. The audit log exports
+  `/api/v1/events.csv` and `/api/v1/events.jsonl` (metadata only, detail
+  redacted). `/api/v1/stream` is a Server-Sent Events feed of ingested events
+  that the console uses for live updates. The policy draft and publish API
+  stays, but the console no longer links it.
+- **Teams**: hook events carry `X-Governance-Team` (stored as `team`, default
+  `unassigned`). CI and lab events take the team of the ticket's owner.
+- **Budgets**: `LAB_BUDGETS` JSON, for example
+  `{"teams":{"Platform":100,"Field Apps":100},"default_person":50,"period":"month"}`
+  (each team has two users, so a team budget is 2 x 50). Burn is month to date;
+  80% is "near limit", 100% is "over".
+- **Performance**: tool time pairs PreToolUse and PostToolUse by
+  `tool_use_id`; a PreToolUse with no PostToolUse within 10 minutes is a tool
+  failure (blocked calls excluded). Turn time is the first prompt after the
+  previous Stop to the next Stop in the same session. Governance check time is
+  this server's own processing time per `/api/v1/hooks` call (`check_ms`).
 - **USD**: USD = Bobcoins x `BOBCOIN_USD_RATE` (default `0.50`, the IBM
   enterprise pack price of $500 per 1,000 Bobcoins; `off` turns USD off). The
   Usage & ROI page can override the rate in the browser.
 - **Install-rule parsing**: a command segment that `shlex` cannot parse is a `GOV-PKG-001` block only when it looks like an install (`pip`, `npm`, `pnpm`, `yarn`, `python -m pip`); other segments, such as `echo 'a|b'`, are ignored.
 - **Reset**: `.venv/bin/python scripts/reset-lab.py` deletes every object under `COS_PREFIX` in the local store (`DATA_DIR/objects`) and prints each one; in COS mode it only prints the `ibmcloud cos` delete command.
+
+## Not measured
+
+Bob hooks do not carry these, so the dashboard does not show them and does
+not estimate them:
+
+- input and output token split (only cumulative context tokens per session)
+- cost by model
+- time to first token
+- edit accept rate
+- share of lines written by the assistant
 
 ## Run it locally
 
