@@ -17,10 +17,10 @@ You need: Bob IDE 2.2.2 or newer (signed in), git, python3, a modern browser, an
 
    ```sh
    git clone https://github.com/sbrick26/bob-sdlc-lab.git
-   cd bob-sdlc-lab && ./start.sh
+   cd bob-sdlc-lab && ./setup.sh      # Windows: powershell -ExecutionPolicy Bypass -File .\setup.ps1
    ```
 
-2. `start.sh` asks: `Who are you? (sam, priya, jordan, alex, or your own first name)`. Type your Lab ID from the card.
+2. The setup script checks and installs what is missing, shows a numbered list of lab profiles and asks for your number, then the two tokens on your card. Run it again at any time to change a value; press Enter to keep the current one.
 3. It asks for the `Dashboard token from your card:` and then the `Dashboard URL from your card:`. Type both from the card.
 4. It writes `lab.env`, sets your git name and email for this repo, and installs the Python packages. It ends with: `Ready, <name>. Open this folder in Bob IDE, then say: check my tickets`.
 5. On a Mac, Bob IDE opens the folder for you. If not, open the `bob-sdlc-lab` folder in Bob IDE yourself.

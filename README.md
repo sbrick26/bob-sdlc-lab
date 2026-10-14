@@ -6,7 +6,7 @@ One hour, one old system, four tickets, the governed way. FieldOps is the work-o
 
 ```sh
 git clone https://github.com/sbrick26/bob-sdlc-lab.git
-cd bob-sdlc-lab && ./start.sh
+cd bob-sdlc-lab && ./setup.sh      # Windows: powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
 Then open the folder in Bob IDE and say: `check my tickets`
