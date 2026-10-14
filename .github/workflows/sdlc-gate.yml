@@ -314,6 +314,9 @@ jobs:
                   "findings": len(v.get("findings") or []),
                   "blocking": v.get("blocking", 0),
                   "seconds": num(os.environ.get("SECONDS_SPENT")) or 0,
+                  "pr_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/pull/{os.environ['PR_NUMBER']}",
+                  "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+                  "findings_text": [str(f)[:300] for f in (v.get("findings") or [])][:20],
               },
           }))
           PY
