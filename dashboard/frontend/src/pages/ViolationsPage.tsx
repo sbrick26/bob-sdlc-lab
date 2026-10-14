@@ -64,29 +64,29 @@ export function ViolationsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Policy findings" title="Violations" description="Every action a rule blocked or flagged: which rule, where in Bob's loop, who, and what was attempted. Excerpts are redacted." actions={<Button kind="ghost" size="sm" renderIcon={Renew} onClick={state.reload}>Refresh</Button>} />
+      <PageHeader title="Violations" actions={<Button kind="ghost" size="sm" renderIcon={Renew} onClick={state.reload}>Refresh</Button>} />
       <section className="kpi-grid kpi-grid--four" aria-label="Violation totals">
-        <StatCard label="Blocked" value={count(t.blocked)} detail="Actions stopped before they ran" signal={t.blocked ? 'negative' : 'neutral'} />
-        <StatCard label="Flagged" value={count(t.observed)} detail="Recorded, not stopped (tool output, response)" />
-        <StatCard label="People affected" value={count(t.users_affected)} detail="Users with at least one finding" />
-        <StatCard label="Rules fired" value={count(t.rules_fired)} detail="Distinct rules with a finding" />
+        <StatCard label="Blocked" value={count(t.blocked)} />
+        <StatCard label="Flagged" value={count(t.observed)} />
+        <StatCard label="People affected" value={count(t.users_affected)} />
+        <StatCard label="Rules fired" value={count(t.rules_fired)} />
       </section>
       <section className="chart-grid">
-        <ChartPanel eyebrow="By rule" question="Which rules block most often?" empty={!charts.rule.length} emptyDetail="No action has been blocked yet.">
+        <ChartPanel title="Blocks by rule" empty={!charts.rule.length} emptyDetail="No action has been blocked yet.">
           <SimpleBarChart data={charts.rule} options={barOptions('Blocked actions (count)', charts.rule) as never} />
         </ChartPanel>
-        <ChartPanel eyebrow="By control point" question="Where in Bob's loop are actions stopped?" empty={!charts.point.some((item) => item.value > 0)} emptyDetail="No action has been blocked yet.">
+        <ChartPanel title="Blocks by control point" empty={!charts.point.some((item) => item.value > 0)} emptyDetail="No action has been blocked yet.">
           <SimpleBarChart data={charts.point} options={barOptions('Blocked actions (count)', charts.point) as never} />
         </ChartPanel>
-        <ChartPanel eyebrow="By person" question="Who triggers the controls?" empty={!charts.user.length} emptyDetail="No action has been blocked yet.">
+        <ChartPanel title="Blocks by person" empty={!charts.user.length} emptyDetail="No action has been blocked yet.">
           <SimpleBarChart data={charts.user} options={barOptions('Blocked actions (count)', charts.user) as never} />
         </ChartPanel>
-        <ChartPanel eyebrow="Over time" question={`When were actions blocked, per ${data.granularity}?`} note={`${data.granularity === "day" ? "Days" : "Hours"} in UTC.`} empty={!charts.time.some((item) => item.value > 0)} emptyDetail="No action has been blocked yet.">
+        <ChartPanel title="Blocks over time" empty={!charts.time.some((item) => item.value > 0)} emptyDetail="No action has been blocked yet.">
           <SimpleBarChart data={charts.time} options={{ ...baseOptions(dark, '280px'), axes: { bottom: { mapsTo: 'key', scaleType: 'labels' }, left: { mapsTo: 'value', title: 'Blocked actions (count)', ...countTicks(Math.max(0, ...charts.time.map((item) => item.value))) } }, legend: { enabled: false }, color: one } as never} />
         </ChartPanel>
       </section>
       <section className="panel table-panel">
-        <div className="panel__header"><div><p className="eyebrow">Findings</p><h2>{count(data.rows.length)} violations, newest first</h2></div><span className="muted">Select a row for the full, redacted record</span></div>
+        <div className="panel__header"><h2>Violations ({count(data.rows.length)})</h2></div>
         {detailError && <p className="inline-error" role="alert">Event unavailable: {detailError}</p>}
         {data.rows.length ? (
           <>

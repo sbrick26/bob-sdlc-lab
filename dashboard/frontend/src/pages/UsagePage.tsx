@@ -14,6 +14,8 @@ import { useApi, useUsdRate } from '../hooks';
 import { LABEL_AXIS, baseOptions, slot, useDarkMode } from '../theme';
 import type { PersonUsage, TicketUsage } from '../types';
 
+type PersonRow = Omit<PersonUsage, 'blocks' | 'prs_opened' | 'prs_merged'> & { automation?: boolean; blocks: number | null; prs_opened: number | null; prs_merged: number | null };
+
 const DEFAULT_BASELINE_HOURS = 4;
 
 export function UsagePage() {
@@ -45,7 +47,7 @@ export function UsagePage() {
     else if (Number.isFinite(value) && value > 0) setRate(value);
   };
 
-  const people: Column<PersonUsage>[] = [
+  const people: Column<PersonRow>[] = [
     { key: 'user', header: 'Person', render: (row) => row.user },
     { key: 'sessions', header: 'Sessions', numeric: true, render: (row) => count(row.sessions) },
     { key: 'turns', header: 'Turns', numeric: true, render: (row) => count(row.turns) },
@@ -73,42 +75,49 @@ export function UsagePage() {
     { key: 'findings', header: 'Findings', numeric: true, render: (row) => count(row.findings) },
   ];
   const r = data.roi;
+  const automation = data.automation;
+  const peopleRows: PersonRow[] = [
+    ...data.people,
+    ...(automation ? [{
+      user: automation.label, automation: true, sessions: automation.sessions, turns: automation.turns,
+      prompts: automation.prompts, tool_calls: automation.tool_calls, bobcoins: automation.bobcoins, usd: automation.usd,
+      tokens: automation.tokens, blocks: null, prs_opened: null, prs_merged: null, ci_first_try_passed: 0, ci_with_result: 0,
+    }] : []),
+  ];
 
   return (
     <>
-      <PageHeader eyebrow="Return on Bob" title="Usage & ROI" description="Bobcoins, context tokens and delivery time per person and per ticket, against a manual baseline you set." actions={
+      <PageHeader title="Usage & ROI" actions={
         <div className="roi-inputs">
           <TextInput id="baseline-hours" size="sm" type="number" min={0.25} step={0.25} labelText="Baseline hours per ticket" value={baselineText} onChange={(event) => onBaseline(event.currentTarget.value)} />
           <TextInput id="usd-rate" size="sm" type="number" min={0} step={0.01} labelText="USD per Bobcoin" placeholder={data.usd_rate == null ? 'Set rate' : String(data.usd_rate)} value={rateText} onChange={(event) => onRate(event.currentTarget.value)} />
           <Button kind="ghost" size="sm" renderIcon={Renew} onClick={state.reload}>Refresh</Button>
         </div>
       } />
-      <section className="kpi-grid kpi-grid--three" aria-label="Return on investment">
-        <StatCard label="Hours saved" value={result.hoursSaved == null ? '—' : `${result.hoursSaved.toLocaleString('en-US')} h`} detail={r.merged ? `${r.merged} merged tickets, ${result.actualHours} h actual` : 'No merged ticket yet'} signal={result.hoursSaved != null && result.hoursSaved > 0 ? 'positive' : 'neutral'} />
-        <StatCard label="Bobcoins per merged PR" value={bobcoins(result.bobcoinsPerPr)} detail={r.merged ? `${r.merged} merged PRs` : 'No merged PR yet'} />
-        <StatCard label="USD per merged PR" value={result.bobcoinsPerPr == null ? '—' : usdText(result.bobcoinsPerPr, rate)} detail="Bobcoins per merged PR × rate" />
-        <StatCard label="Bobcoin spend" value={bobcoins(r.bobcoins_total)} detail="All sessions, all tickets" />
-        <StatCard label="USD spend" value={usdText(r.bobcoins_total, rate)} detail="Bobcoin spend × rate" />
-        <StatCard label="First-try CI pass rate" value={percent(result.firstTryRate)} detail={r.ci_with_result ? `${r.ci_first_try_passed} of ${r.ci_with_result} PRs passed the first review` : 'No CI result yet'} />
+      <section className="kpi-grid kpi-grid--four" aria-label="Return on investment">
+        <StatCard label="Hours saved" value={result.hoursSaved == null ? '—' : `${result.hoursSaved.toLocaleString('en-US')} h`} />
+        <StatCard label="Bobcoins per merged PR" value={bobcoins(result.bobcoinsPerPr)} detail={result.bobcoinsPerPr == null ? undefined : usdText(result.bobcoinsPerPr, rate)} />
+        <StatCard label="Bobcoin spend" value={bobcoins(r.bobcoins_total)} detail={r.bobcoins_total == null ? undefined : usdText(r.bobcoins_total, rate)} />
+        <StatCard label="First-try CI pass rate" value={percent(result.firstTryRate)} />
       </section>
       <p className="formula">Hours saved = merged tickets × {baseline} h baseline − actual hours from ticket start to merge. Bobcoins per merged PR = Bobcoins on merged tickets ÷ merged PRs. USD = Bobcoins × rate.</p>
       <RateNote rate={rate} basis={data.usd_rate_basis} fromBrowser={fromBrowser} />
 
       <section className="chart-grid">
-        <ChartPanel eyebrow="Spend over time" question="How fast is the Bobcoin spend growing?" empty={!charts.over.length} emptyDetail="Spend appears after Bob sends a Stop event with a session cost.">
+        <ChartPanel title="Cumulative Bobcoins" empty={!charts.over.length} emptyDetail="Spend appears after Bob sends a Stop event with a session cost.">
           <LineChart data={charts.over} options={{ ...baseOptions(dark), axes: { bottom: { mapsTo: 'date', scaleType: 'time' }, left: { mapsTo: 'value', title: 'Cumulative Bobcoins (BC)' } }, curve: 'curveStepAfter', points: { enabled: false }, legend: { enabled: false }, color: { scale: { 'Cumulative Bobcoins': slot(0, dark) } } } as never} />
         </ChartPanel>
-        <ChartPanel eyebrow="Cost per PR" question="What did each merged PR cost in Bobcoins?" empty={!charts.perPr.length} emptyDetail="Bars appear when a merged ticket has usage.">
+        <ChartPanel title="Bobcoins per merged PR" empty={!charts.perPr.length} emptyDetail="Bars appear when a merged ticket has usage.">
           <SimpleBarChart data={charts.perPr} options={{ ...baseOptions(dark), axes: { left: { mapsTo: 'key', ...LABEL_AXIS }, bottom: { mapsTo: 'value', title: 'Bobcoins (BC) per merged PR' } }, legend: { enabled: false }, color: { scale: { Bobcoins: slot(0, dark) } } } as never} />
         </ChartPanel>
       </section>
 
       <section className="panel table-panel">
-        <div className="panel__header"><div><p className="eyebrow">People</p><h2>Usage per person</h2></div></div>
-        {data.people.length ? <NumberTable label="Usage per person" columns={people} rows={data.people} rowKey={(row) => row.user} /> : <EmptyState title="No users yet" detail="People appear after their first Bob event." />}
+        <div className="panel__header"><h2>Usage by person</h2></div>
+        {peopleRows.length ? <NumberTable label="Usage by person" columns={people} rows={peopleRows} rowKey={(row) => row.user} rowClass={(row) => row.automation ? 'row--automation' : undefined} /> : <EmptyState title="No users yet" detail="People appear after their first Bob event." />}
       </section>
       <section className="panel table-panel">
-        <div className="panel__header"><div><p className="eyebrow">Tickets</p><h2>Delivery and cost per ticket</h2></div><span className="muted">Bobcoins include the CI review session on the ticket</span></div>
+        <div className="panel__header"><h2>Delivery and cost by ticket</h2></div>
         {data.tickets.length ? <NumberTable label="Delivery per ticket" columns={tickets} rows={data.tickets} rowKey={(row) => row.ticket} /> : <EmptyState title="No tickets yet" detail="Tickets appear when events carry X-Lab-Ticket." />}
       </section>
     </>

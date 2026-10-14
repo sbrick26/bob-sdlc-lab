@@ -233,3 +233,31 @@ def test_overview_summary_endpoint_shape():
     }
     assert overview["granularity"] in {"hour", "day"}
     assert client.get("/api/v1/overview/summary").status_code == 401
+
+
+def test_ci_reviewer_is_automation_not_a_person():
+    reviewer = {**stop("12:00", "ci", cost=2.0, tokens=900, turns=2, user="ci-reviewer"), "lab_role": "ci-reviewer"}
+    rows = [stop("10:00", "a", cost=3.0, tokens=1000, turns=3), reviewer]
+    usage = metrics.usage_summary(rows)
+    assert [person["user"] for person in usage["people"]] == ["sam"]
+    assert usage["automation"]["label"] == "Automated review (CI)"
+    assert usage["automation"]["bobcoins"] == 2.0 and usage["automation"]["sessions"] == 1
+    assert usage["roi"]["bobcoins_total"] == 5.0
+    assert metrics.bobcoins_by_ticket(rows) == {"T-1": 5.0}
+    overview = metrics.overview_summary(rows)
+    assert overview["users"] == ["sam"]
+    assert overview["kpis"]["active_users"] == 1 and overview["kpis"]["sessions"] == 1
+    assert {item["user"] for item in overview["bobcoins_by_user"]} == {"sam", "Automated review (CI)"}
+    assert overview["kpis"]["bobcoins"] == 5.0
+
+
+def test_day_buckets_follow_the_viewer_time_zone():
+    rows = [stop("02:00", "a", cost=1.0, day="2026-01-02"), stop("10:00", "b", cost=1.0, day="2026-01-01")]
+    utc = {item["bucket"] for item in metrics.overview_summary(rows)["bobcoins_by_user"]}
+    assert utc == {"2026-01-01", "2026-01-02"}
+    # UTC-5 (getTimezoneOffset 300): 02:00 UTC on Jan 2 is 21:00 on Jan 1, so both land on Jan 1.
+    local = metrics.overview_summary(rows, tz_offset=300)
+    assert local["granularity"] == "hour"
+    assert all(item["bucket"].startswith("2026-01-01T") for item in local["bobcoins_by_user"])
+    assert client.get("/api/v1/overview/summary?tz_offset=300", auth=AUTH).status_code == 200
+    assert client.get("/api/v1/violations/summary?tz_offset=9999", auth=AUTH).status_code == 422

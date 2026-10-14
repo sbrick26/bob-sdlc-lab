@@ -26,8 +26,11 @@ export function slot(index: number, dark: boolean): string {
 }
 
 /** Color follows the entity: the index in a stable, sorted list, never rank. */
-export function colorScale(names: string[], dark: boolean): Record<string, string> {
-  return Object.fromEntries(names.map((name, index) => [name, slot(index, dark)]));
+export function colorScale(names: string[], dark: boolean, muted: string[] = []): Record<string, string> {
+  return {
+    ...Object.fromEntries(names.map((name, index) => [name, slot(index, dark)])),
+    ...Object.fromEntries(muted.map((name) => [name, dark ? OTHER.dark : OTHER.light])),
+  };
 }
 
 /** Shared Carbon chart options: no animation, legend, table view in the toolbar. */
@@ -36,7 +39,7 @@ export function baseOptions(dark: boolean, height = '300px'): Record<string, unk
     height,
     theme: dark ? 'g100' : 'g10',
     animations: false,
-    legend: { alignment: 'left' },
+    legend: { alignment: 'left', truncation: { type: 'end_line', threshold: 32, numCharacter: 32 } },
     toolbar: { enabled: true, numberOfIcons: 1, controls: [{ type: 'Show as data-table' }] },
     grid: { x: { enabled: false } },
     bars: { maxWidth: 28 },

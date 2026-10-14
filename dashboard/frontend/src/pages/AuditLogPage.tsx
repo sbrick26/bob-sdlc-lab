@@ -43,14 +43,14 @@ export function AuditLogPage() {
   const { facets, events } = state.data;
   return (
     <>
-      <PageHeader eyebrow="Every hook and lab event" title="Audit log" description="Filter the full record, open any event for its redacted detail, or download the filtered rows as CSV." actions={
+      <PageHeader title="Audit log" actions={
         <>
           <Button kind="ghost" size="sm" renderIcon={Renew} onClick={state.reload}>Refresh</Button>
           <Button kind="primary" size="sm" renderIcon={Download} href={api.csvUrl(toParams(filters))}>Download CSV</Button>
         </>
       } />
       <section className="filter-panel filter-panel--audit" aria-label="Audit log filters">
-        <div className="filter-panel__title"><strong>Filter events</strong><Button kind="ghost" size="sm" onClick={() => { setPage(1); setFilters(initial); }}>Clear</Button></div>
+        <div className="filter-panel__title"><strong>Filters</strong><Button kind="ghost" size="sm" onClick={() => { setPage(1); setFilters(initial); }}>Clear</Button></div>
         <FacetSelect id="filter-user" label="User" value={filters.user} values={facets.users} onChange={(value) => update('user', value)} />
         <FacetSelect id="filter-ticket" label="Ticket" value={filters.ticket} values={facets.tickets ?? []} onChange={(value) => update('ticket', value)} />
         <FacetSelect id="filter-event" label="Event type" value={filters.event} values={facets.events} onChange={(value) => update('event', value)} />
@@ -59,7 +59,7 @@ export function AuditLogPage() {
         <TextInput id="filter-until" type="date" labelText="To" value={filters.until} onChange={(event) => update('until', event.currentTarget.value)} />
       </section>
       <section className="panel table-panel">
-        <div className="panel__header"><div><p className="eyebrow">Records</p><h2>{count(events.length)} events</h2></div><span className="muted">CSV holds metadata only, no prompt or tool content</span></div>
+        <div className="panel__header"><h2>Events ({count(events.length)})</h2></div>
         {detailError && <p className="inline-error" role="alert">Event content unavailable: {detailError}</p>}
         {events.length ? (
           <>

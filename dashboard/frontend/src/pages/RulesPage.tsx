@@ -24,9 +24,9 @@ export function RulesPage() {
   if (state.error || !state.data) return <PageError error={state.error || new Error('No rules returned')} retry={state.reload} />;
   return (
     <>
-      <PageHeader eyebrow="Read only" title="Rules" description="The managed rules every Bob hook call is checked against, where each one runs, and how often it has fired." actions={<Button kind="ghost" size="sm" renderIcon={Renew} onClick={state.reload}>Refresh</Button>} />
+      <PageHeader title="Rules" actions={<Button kind="ghost" size="sm" renderIcon={Renew} onClick={state.reload}>Refresh</Button>} />
       <section className="panel table-panel">
-        <div className="panel__header"><div><p className="eyebrow">Catalog</p><h2>{state.data.count} rules</h2></div></div>
+        <div className="panel__header"><h2>Rules ({state.data.count})</h2></div>
         {state.data.rules.length ? <NumberTable label="Rules" columns={columns} rows={state.data.rules} rowKey={(row) => row.rule_id} /> : <EmptyState title="No rules" detail="The rule catalog is empty." />}
       </section>
     </>

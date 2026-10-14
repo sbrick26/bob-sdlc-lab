@@ -1121,13 +1121,15 @@ def lab_roi(baseline_minutes: float = Query(240, gt=0, le=100_000)) -> dict[str,
 
 
 @app.get("/api/v1/overview/summary", dependencies=[Depends(require_dashboard)])
-def overview_summary() -> dict[str, Any]:
-    return metrics.overview_summary(db.all_events())
+def overview_summary(tz_offset: int = Query(0, ge=-840, le=840)) -> dict[str, Any]:
+    return metrics.overview_summary(db.all_events(), tz_offset=tz_offset)
 
 
 @app.get("/api/v1/violations/summary", dependencies=[Depends(require_dashboard)])
-def violations_summary(limit: int = Query(500, ge=1, le=2000)) -> dict[str, Any]:
-    return metrics.violations_summary(db.all_events(), redact, limit=limit)
+def violations_summary(
+    limit: int = Query(500, ge=1, le=2000), tz_offset: int = Query(0, ge=-840, le=840),
+) -> dict[str, Any]:
+    return metrics.violations_summary(db.all_events(), redact, limit=limit, tz_offset=tz_offset)
 
 
 @app.get("/api/v1/usage/summary", dependencies=[Depends(require_dashboard)])

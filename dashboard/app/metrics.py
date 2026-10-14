@@ -130,7 +130,7 @@ def usage_deltas(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     for row in ordered:
         session = _session_key(row)
         record = {
-            "occurred_at": row.get("occurred_at"), "user": row.get("user_name"),
+            "occurred_at": row.get("occurred_at"), "user": row.get("user_name"), "ci": is_ci(row),
             "ticket": row.get("lab_ticket"), "session": session,
             "bobcoins": None, "tokens": None, "turns": None,
         }
@@ -165,17 +165,23 @@ def bobcoins_by_ticket(rows: list[dict[str, Any]]) -> dict[str, float]:
 
 # ---------------------------------------------------------------- time buckets
 
-def _buckets(times: list[datetime]) -> tuple[str, list[str]]:
-    """Hour buckets when all data sits in one day, day buckets otherwise."""
+def _local(value: datetime, tz_offset: int) -> datetime:
+    """Shift UTC to the viewer's local clock. tz_offset is JavaScript's getTimezoneOffset()."""
+    return value - timedelta(minutes=tz_offset)
+
+
+def _buckets(times: list[datetime], tz_offset: int = 0) -> tuple[str, list[str]]:
+    """Hour buckets when all data sits in one local day, day buckets otherwise."""
     if not times:
         return "day", []
-    first, last = min(times), max(times)
+    local = [_local(value, tz_offset) for value in times]
+    first, last = min(local), max(local)
     if first.date() == last.date():
         cursor = first.replace(minute=0, second=0, microsecond=0)
         end = last.replace(minute=0, second=0, microsecond=0)
         labels = []
         while cursor <= end:
-            labels.append(cursor.strftime("%Y-%m-%dT%H:00:00Z"))
+            labels.append(cursor.strftime("%Y-%m-%dT%H:00:00"))
             cursor += timedelta(hours=1)
         return "hour", labels
     cursor, labels = first.date(), []
@@ -185,11 +191,12 @@ def _buckets(times: list[datetime]) -> tuple[str, list[str]]:
     return "day", labels
 
 
-def _bucket_of(value: Any, granularity: str) -> str | None:
+def _bucket_of(value: Any, granularity: str, tz_offset: int = 0) -> str | None:
     parsed = _parse(value)
     if not parsed:
         return None
-    return parsed.strftime("%Y-%m-%dT%H:00:00Z") if granularity == "hour" else parsed.date().isoformat()
+    parsed = _local(parsed, tz_offset)
+    return parsed.strftime("%Y-%m-%dT%H:00:00") if granularity == "hour" else parsed.date().isoformat()
 
 
 def _times(rows: Iterable[dict[str, Any]]) -> list[datetime]:
@@ -277,9 +284,19 @@ def excerpt(row: dict[str, Any], redact_fn: Callable[[Any], tuple[str, list[str]
 
 # ---------------------------------------------------------------- shared pieces
 
+CI_LABEL = "Automated review (CI)"
+CI_ROLE = "ci-reviewer"
+
+
+def is_ci(row: dict[str, Any]) -> bool:
+    """The CI reviewer is automation, not a person."""
+    return row.get("lab_role") == CI_ROLE or row.get("user_name") == CI_ROLE or row.get("user") == CI_ROLE
+
+
 def _users(rows: list[dict[str, Any]], board: list[dict[str, Any]]) -> list[str]:
-    names = {str(row["user_name"]) for row in rows if _is_hook(row) and row.get("user_name")}
-    names.update(str(entry["user"]) for entry in board if entry.get("user"))
+    """People only: the CI reviewer is left out."""
+    names = {str(row["user_name"]) for row in rows if _is_hook(row) and row.get("user_name") and not is_ci(row)}
+    names.update(str(entry["user"]) for entry in board if entry.get("user") and entry["user"] != CI_ROLE)
     return sorted(names)
 
 
@@ -313,7 +330,7 @@ def _ticket_rows(rows: list[dict[str, Any]], board: list[dict[str, Any]], rate: 
 
 # ---------------------------------------------------------------- Overview
 
-def overview_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def overview_summary(rows: list[dict[str, Any]], tz_offset: int = 0) -> dict[str, Any]:
     rate = usd_rate()
     board = lab.lab_board(rows)
     hooks = [row for row in rows if _is_hook(row)]
@@ -325,16 +342,20 @@ def overview_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     merged_minutes = [ticket["minutes_to_merge"] for ticket in merged if ticket["minutes_to_merge"] is not None]
     merged_bobcoins = [ticket["bobcoins"] for ticket in merged if ticket["bobcoins"] is not None]
     per_pr = round(sum(merged_bobcoins) / len(merged), 4) if merged and merged_bobcoins else None
+    people = [row for row in hooks if not is_ci(row)]
+    with_ci = [ticket for ticket in tickets if ticket["first_try_pass"] is not None]
+    first_try = sum(bool(ticket["first_try_pass"]) for ticket in with_ci)
 
-    granularity, labels = _buckets(_times(hooks) + _times(deltas))
+    granularity, labels = _buckets(_times(hooks) + _times(deltas), tz_offset)
     spend: dict[tuple[str, str], float] = defaultdict(float)
     for record in deltas:
-        bucket = _bucket_of(record["occurred_at"], granularity)
+        bucket = _bucket_of(record["occurred_at"], granularity, tz_offset)
         if bucket and record["bobcoins"] is not None:
-            spend[(bucket, str(record["user"] or "unknown"))] += record["bobcoins"]
+            who = CI_LABEL if record["ci"] else str(record["user"] or "unknown")
+            spend[(bucket, who)] += record["bobcoins"]
     activity = {label: {"bucket": label, "prompts": 0, "tool_calls": 0, "blocks": 0} for label in labels}
     for row in hooks:
-        bucket = _bucket_of(row.get("occurred_at"), granularity)
+        bucket = _bucket_of(row.get("occurred_at"), granularity, tz_offset)
         if bucket not in activity:
             continue
         if row.get("hook_event") == "UserPromptSubmit":
@@ -353,8 +374,8 @@ def overview_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "users": _users(rows, board),
         "granularity": granularity,
         "kpis": {
-            "active_users": len({row.get("user_name") for row in hooks if row.get("user_name")}),
-            "sessions": len({row.get("session_id") for row in hooks if row.get("session_id") not in {None, "", "unknown"}}),
+            "active_users": len({row.get("user_name") for row in people if row.get("user_name")}),
+            "sessions": len({row.get("session_id") for row in people if row.get("session_id") not in {None, "", "unknown"}}),
             "prompts": sum(row.get("hook_event") == "UserPromptSubmit" for row in hooks),
             "tool_calls": sum(row.get("hook_event") == "PreToolUse" for row in hooks),
             "bobcoins": bobcoins, "usd": to_usd(bobcoins, rate),
@@ -363,7 +384,10 @@ def overview_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "prs_merged": len(merged),
             "median_minutes_to_merge": round(statistics.median(merged_minutes), 1) if merged_minutes else None,
             "bobcoins_per_merged_pr": per_pr, "usd_per_merged_pr": to_usd(per_pr, rate),
+            "ci_with_result": len(with_ci), "ci_first_try_passed": first_try,
+            "first_try_pass_rate_pct": round(first_try / len(with_ci) * 100, 1) if with_ci else None,
         },
+        "ci_label": CI_LABEL,
         "bobcoins_by_user": [
             {"bucket": bucket, "user": user, "bobcoins": round(value, 4)}
             for (bucket, user), value in sorted(spend.items())
@@ -383,7 +407,7 @@ def violation_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [row for row in rows if row.get("rule_id") and row.get("decision") in {"blocked", "observed"}]
 
 
-def violations_summary(rows: list[dict[str, Any]], redact_fn: Callable[[Any], tuple[str, list[str]]] | None = None, limit: int = 500) -> dict[str, Any]:
+def violations_summary(rows: list[dict[str, Any]], redact_fn: Callable[[Any], tuple[str, list[str]]] | None = None, limit: int = 500, tz_offset: int = 0) -> dict[str, Any]:
     found = sorted(violation_rows(rows), key=lambda row: str(row.get("occurred_at") or ""), reverse=True)
     blocked = [row for row in found if row.get("decision") == "blocked"]
     by_rule: dict[str, dict[str, Any]] = {}
@@ -394,11 +418,11 @@ def violations_summary(rows: list[dict[str, Any]], redact_fn: Callable[[Any], tu
         entry["blocked"] += 1
         point = control_point(row)
         by_point[point] = by_point.get(point, 0) + 1
-        by_user[str(row.get("user_name") or "unknown")] += 1
-    granularity, labels = _buckets(_times(found))
+        by_user[CI_LABEL if is_ci(row) else str(row.get("user_name") or "unknown")] += 1
+    granularity, labels = _buckets(_times(found), tz_offset)
     over_time = {label: 0 for label in labels}
     for row in blocked:
-        bucket = _bucket_of(row.get("occurred_at"), granularity)
+        bucket = _bucket_of(row.get("occurred_at"), granularity, tz_offset)
         if bucket in over_time:
             over_time[bucket] += 1
     return {
@@ -406,7 +430,7 @@ def violations_summary(rows: list[dict[str, Any]], redact_fn: Callable[[Any], tu
         "totals": {
             "violations": len(found), "blocked": len(blocked),
             "observed": sum(row.get("decision") == "observed" for row in found),
-            "users_affected": len({row.get("user_name") for row in found}),
+            "users_affected": len({row.get("user_name") for row in found if not is_ci(row)}),
             "rules_fired": len({row.get("rule_id") for row in found}),
         },
         "by_rule": sorted(by_rule.values(), key=lambda item: (-item["blocked"], item["rule_id"])),
@@ -436,8 +460,8 @@ def usage_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     hooks = [row for row in rows if _is_hook(row)]
     people = []
     for user in _users(rows, board):
-        mine = [row for row in hooks if row.get("user_name") == user]
-        my_deltas = [record for record in deltas if record["user"] == user]
+        mine = [row for row in hooks if row.get("user_name") == user and not is_ci(row)]
+        my_deltas = [record for record in deltas if record["user"] == user and not record["ci"]]
         owned = [ticket for ticket in tickets if ticket["user"] == user]
         with_ci = [ticket for ticket in owned if ticket["first_try_pass"] is not None]
         bobcoins = _round(_sum(my_deltas, "bobcoins"))
@@ -457,6 +481,23 @@ def usage_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "ci_first_try_passed": sum(bool(ticket["first_try_pass"]) for ticket in with_ci),
             "ci_with_result": len(with_ci),
         })
+    ci_rows = [row for row in hooks if is_ci(row)]
+    ci_deltas = [record for record in deltas if record["ci"]]
+    automation = None
+    if ci_rows or ci_deltas:
+        ci_coins = _round(_sum(ci_deltas, "bobcoins"))
+        ci_tokens = _sum(ci_deltas, "tokens")
+        ci_turns = _sum(ci_deltas, "turns")
+        automation = {
+            "label": CI_LABEL,
+            "sessions": len({row.get("session_id") for row in ci_rows if row.get("session_id") not in {None, "", "unknown"}}),
+            "turns": None if ci_turns is None else int(ci_turns),
+            "prompts": sum(row.get("hook_event") == "UserPromptSubmit" for row in ci_rows),
+            "tool_calls": sum(row.get("hook_event") == "PreToolUse" for row in ci_rows),
+            "bobcoins": ci_coins, "usd": to_usd(ci_coins, rate),
+            "tokens": None if ci_tokens is None else int(ci_tokens),
+            "reviews": sum(row.get("lab_kind") == "ci_result" for row in rows),
+        }
     cumulative, running = [], 0.0
     for record in deltas:
         if record["bobcoins"]:
@@ -472,6 +513,7 @@ def usage_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "usd_rate": rate, "usd_rate_basis": usd_rate_basis(rate),
         "users": _users(rows, board),
         "people": people,
+        "automation": automation,
         "tickets": tickets,
         "bobcoins_over_time": cumulative,
         "cost_per_merged_pr": [

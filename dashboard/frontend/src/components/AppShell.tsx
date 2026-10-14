@@ -1,6 +1,7 @@
 import { ChartLine, DocumentView, Money, Renew, Rule, WarningAlt } from '@carbon/icons-react';
 import { Header, HeaderGlobalAction, HeaderGlobalBar, HeaderName } from '@carbon/react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
+import ibmLogo from '../assets/ibm-logo.svg';
 
 const navigation = [
   { to: '/', label: 'Overview', icon: ChartLine, end: true },
@@ -10,13 +11,9 @@ const navigation = [
   { to: '/rules', label: 'Rules', icon: Rule, end: false },
 ];
 
-function ProductMark() {
-  return (
-    <svg className="product-mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M10 1.5 17.5 4.5v5.2c0 4.3-3.1 7.6-7.5 8.8-4.4-1.2-7.5-4.5-7.5-8.8V4.5L10 1.5Z" fill="none" stroke="currentColor" strokeWidth="1.6" />
-      <path d="m6.6 10 2.4 2.4 4.6-4.8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+/** IBM 8-bar logo, from src/assets/ibm-logo.svg, painted in the header's logo color through a CSS mask. */
+function IbmLogo() {
+  return <span className="ibm-logo" role="img" aria-label="IBM" style={{ WebkitMaskImage: `url("${ibmLogo}")`, maskImage: `url("${ibmLogo}")` }} />;
 }
 
 export function AppShell() {
@@ -24,7 +21,7 @@ export function AppShell() {
     <div className="app-shell">
       <a className="skip-link" href="#main-content">Skip to content</a>
       <Header aria-label="Governance">
-        <HeaderName as={Link} to="/" prefix=""><ProductMark /><span>Governance</span></HeaderName>
+        <HeaderName as={Link} to="/" prefix=""><IbmLogo /><span className="header-title">Governance</span></HeaderName>
         <HeaderGlobalBar>
           <HeaderGlobalAction aria-label="Refresh page" onClick={() => window.location.reload()}><Renew /></HeaderGlobalAction>
         </HeaderGlobalBar>

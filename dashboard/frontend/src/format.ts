@@ -44,9 +44,9 @@ export function median(values: number[]): number | null {
   return clean.length % 2 ? clean[middle] : (clean[middle - 1] + clean[middle]) / 2;
 }
 
-/** Time bucket label from the API ("2026-10-13" or "2026-10-13T14:00:00Z"). */
+/** Label for a local-time bucket from the API ("2026-10-13" or "2026-10-13T14:00:00"). */
 export function bucketLabel(bucket: string, granularity: string): string {
-  const date = new Date(granularity === 'hour' ? bucket : `${bucket}T12:00:00Z`);
+  const date = new Date(granularity === 'hour' ? bucket : `${bucket}T12:00:00`);
   if (Number.isNaN(date.getTime())) return bucket;
   return granularity === 'hour'
     ? date.toLocaleString('en-US', { hour: 'numeric', hour12: true })

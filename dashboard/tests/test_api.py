@@ -413,7 +413,7 @@ def test_product_ui_omits_infrastructure_and_demo_warnings():
     )
     for unwanted in ("Code Engine", "SimpleMDM", "Demo limitation", "Content handling", "Policy explanation"):
         assert unwanted not in compiled
-    for wanted in ("Which rules blocked the most actions?", "Usage & ROI", "Download CSV", "Bobcoins per merged PR"):
+    for wanted in ("Blocks by rule", "Usage & ROI", "Download CSV", "Bobcoins per merged PR", "Time to merge by ticket"):
         assert wanted in compiled
     for removed in ("IBM Bob", "Policy operations", "Publish policy"):
         assert removed not in compiled

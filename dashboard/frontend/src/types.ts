@@ -62,7 +62,11 @@ export interface OverviewSummary extends Rate {
     median_minutes_to_merge: number | null;
     bobcoins_per_merged_pr: number | null;
     usd_per_merged_pr: number | null;
+    ci_with_result: number;
+    ci_first_try_passed: number;
+    first_try_pass_rate_pct: number | null;
   };
+  ci_label: string;
   bobcoins_by_user: Array<{ bucket: string; user: string; bobcoins: number }>;
   activity: Array<{ bucket: string; prompts: number; tool_calls: number; blocks: number }>;
   time_to_merge: Array<{ ticket: string; user: string; minutes: number }>;
@@ -127,6 +131,7 @@ export interface TicketUsage {
 export interface UsageSummary extends Rate {
   users: string[];
   people: PersonUsage[];
+  automation: { label: string; sessions: number; turns: number | null; prompts: number; tool_calls: number; bobcoins: number | null; usd: number | null; tokens: number | null; reviews: number } | null;
   tickets: TicketUsage[];
   bobcoins_over_time: Array<{ time: string; bobcoins: number; usd: number | null }>;
   cost_per_merged_pr: Array<{ ticket: string; user: string | null; bobcoins: number; usd: number | null }>;
