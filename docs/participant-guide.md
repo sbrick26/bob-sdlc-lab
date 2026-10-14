@@ -53,14 +53,11 @@ Bob never picks a ticket assigned to someone else.
    | Risk and compliance | personal data, secrets, data loss, rollback |
    | Approval | `Requester approval: pending` |
 
-3. Bob posts a short summary as a Jira comment and moves the ticket to In Review. It stops with: `Spec posted. Requester: reply approve, or tell me what to change.`
-4. Read the plan. You are the requester. To change it, say what to change. To approve, reply:
+3. Bob posts a short summary as a Jira comment and moves the ticket to In Review. It stops and asks the requester to approve.
+4. The guide plays the requester. They read the plan on the Jira ticket and reply with a comment that starts with `Approved`. To ask for a change, they comment what to change, and you tell Bob to update the plan.
+5. Run `/build <KEY>`. Bob finds the approval comment on the ticket, writes `Requester approval: approved by <name> in Jira on <date>` into the plan with the comment link, and starts building. If there is no approval yet, Bob stops and says so.
 
-   ```
-   approve. I am <Name> Lab, the requester.
-   ```
-
-5. Bob writes `Requester approval: approved by <name>` into the plan and says `Run /build <KEY>.`
+   Working alone? You can also approve in the chat by replying `approve. I am <Name> Lab, the requester.`
 
 ## 25 to 40 min: build
 
