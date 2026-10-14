@@ -109,10 +109,15 @@ jobs:
       BRANCH: ${{ github.event.pull_request.head.ref }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-      MAIN_DIR: ${{ runner.temp }}/main
-      CI_DIR: ${{ runner.temp }}/main/tools/ci
-      OUT_DIR: ${{ runner.temp }}/review
     steps:
+      - name: Set work paths
+        run: |
+          {
+            echo "MAIN_DIR=$RUNNER_TEMP/main"
+            echo "CI_DIR=$RUNNER_TEMP/main/tools/ci"
+            echo "OUT_DIR=$RUNNER_TEMP/review"
+          } >> "$GITHUB_ENV"
+
       - name: Check out PR head
         uses: actions/checkout@v4
         with:
