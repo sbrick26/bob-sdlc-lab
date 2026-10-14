@@ -3,7 +3,7 @@
 Exit 2 only when the dashboard says "blocked" on UserPromptSubmit or PreToolUse.
 Any failure to reach the dashboard = fail open (exit 0). Hooks are a speed bump, not the control.
 """
-import json, os, socket, sys, urllib.request
+import json, os, socket, sys, time, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _lab
 
@@ -41,6 +41,13 @@ if event == "Stop" and payload.get("session_id"):
         headers.update({"X-Lab-Cost": "%.6f" % credits, "X-Lab-Tokens": str(int(ctx or 0)), "X-Lab-Turns": str(int(turns or 0))})
     except Exception as e:
         print("usage lookup skipped: %s" % e, file=sys.stderr)
+# Round trip of the previous hook call, as the laptop saw it (network + server), sent with this one.
+_rtt_file = _lab.marker_path("last-hook-ms")
+try:
+    headers["X-Hook-Prev-Ms"] = open(_rtt_file).read().strip()[:12]
+except Exception:
+    pass
+_t0 = time.monotonic()
 req = urllib.request.Request(url + "/api/v1/hooks", data=json.dumps(payload).encode(), headers=headers, method="POST")
 try:
     with urllib.request.urlopen(req, timeout=float(env.get("DASHBOARD_TIMEOUT", "3"))) as r:
@@ -48,6 +55,10 @@ try:
 except Exception as e:
     print("dashboard unreachable, continuing: %s" % e, file=sys.stderr)
     sys.exit(0)
+try:
+    open(_rtt_file, "w").write(str(int((time.monotonic() - _t0) * 1000)))
+except Exception:
+    pass
 
 if body.get("context"):
     print(body["context"])
