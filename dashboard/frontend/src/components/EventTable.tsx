@@ -5,11 +5,11 @@ import { DecisionTag } from './DecisionTag';
 const headers = [
   { key: 'occurred_at', header: 'Time' },
   { key: 'user_name', header: 'User' },
-  { key: 'hook_event', header: 'Control point' },
-  { key: 'decision', header: 'Decision' },
-  { key: 'rule_name', header: 'Rule' },
+  { key: 'lab_ticket', header: 'Ticket' },
+  { key: 'hook_event', header: 'Event type' },
   { key: 'tool_name', header: 'Tool' },
-  { key: 'duration_ms', header: 'Evaluation time' },
+  { key: 'rule_name', header: 'Rule' },
+  { key: 'decision', header: 'Decision' },
 ];
 
 export function EventTable({ events, onSelect, compact = false }: { events: GovernanceEvent[]; onSelect: (event: GovernanceEvent) => void; compact?: boolean }) {
@@ -17,9 +17,9 @@ export function EventTable({ events, onSelect, compact = false }: { events: Gove
     ...event,
     id: event.event_id,
     occurred_at: new Date(event.occurred_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
-    rule_name: event.rule_name || 'No finding',
+    rule_name: event.rule_name || '—',
     tool_name: event.tool_name || '—',
-    duration_ms: event.duration_ms == null ? '—' : `${event.duration_ms} ms`,
+    lab_ticket: event.lab_ticket || '—',
   }));
   const visibleHeaders = compact ? headers.slice(0, 5) : headers;
   return (

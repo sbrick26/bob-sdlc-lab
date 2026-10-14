@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { RATE_KEY, readNumber, writeNumber } from './format';
 
 export function useApi<T>(loader: () => Promise<T>, dependencies: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -19,4 +20,11 @@ export function useApi<T>(loader: () => Promise<T>, dependencies: unknown[] = []
 
   useEffect(() => { void reload(); }, [reload]);
   return { data, setData, error, loading, reload };
+}
+
+/** USD per Bobcoin: a value saved in this browser wins, else the server rate. */
+export function useUsdRate(serverRate: number | null | undefined) {
+  const [saved, setSaved] = useState<number | null>(() => readNumber(RATE_KEY, null));
+  const update = useCallback((value: number | null) => { setSaved(value); writeNumber(RATE_KEY, value); }, []);
+  return { rate: saved ?? serverRate ?? null, saved, fromBrowser: saved != null, setRate: update };
 }

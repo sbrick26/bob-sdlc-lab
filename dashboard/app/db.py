@@ -24,8 +24,10 @@ FIELDS = (
     "detail", "evidence", "prompt_content", "tool_input_content", "tool_output_content",
     "response_content", "session_id",
     # Lab fields: ticket, role, and branch headers from the lab hook client,
-    # optional per-event cost, the edited file path, and lab (GitHub/CI) event data.
+    # Bobcoins (X-Lab-Cost), context tokens and turns (cumulative per session on
+    # Stop events), the edited file path, and lab (GitHub/CI) event data.
     "lab_ticket", "lab_role", "lab_branch", "lab_cost", "lab_path", "lab_kind", "lab_pr", "lab_data",
+    "lab_tokens", "lab_turns",
 )
 
 SORT_COLUMNS = {
@@ -390,11 +392,24 @@ def _filtered_events(filters: dict[str, Any]) -> list[dict[str, Any]]:
     for key, field in mapping.items():
         if filters.get(key):
             rows = [row for row in rows if row.get(field) == filters[key]]
+    since = str(filters.get("since") or "").strip()
+    if since:
+        rows = [row for row in rows if str(row.get("occurred_at") or "") >= since]
+    until = str(filters.get("until") or "").strip()
+    if until:
+        # A date-only bound includes the whole day.
+        width = 10 if len(until) == 10 else len(until)
+        rows = [row for row in rows if str(row.get("occurred_at") or "")[:width] <= until]
     query = str(filters.get("q") or "").lower()
     if query:
         fields = ("detail", "workspace", "rule_name", "user_name", "device_name")
         rows = [row for row in rows if any(query in str(row.get(field) or "").lower() for field in fields)]
     return rows
+
+
+def filtered_events(filters: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every event that matches the filters, metadata and inline content, unsorted."""
+    return [_copy(row) or {} for row in _filtered_events(filters)]
 
 
 def query_events(filters: dict[str, Any], limit: int = 250, sort: str = "time", direction: str = "desc") -> list[dict[str, Any]]:

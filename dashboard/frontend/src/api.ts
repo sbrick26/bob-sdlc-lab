@@ -1,15 +1,7 @@
-import type { Analytics, Facets, FleetDevice, GovernanceEvent, LabRoi, LabTicket, PolicyCatalog, PolicyDraft, Rollout } from './types';
-import { policyConfig } from './policyWorkflow';
+import type { Facets, GovernanceEvent, OverviewSummary, RuleSummary, UsageSummary, ViolationsSummary } from './types';
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init?.headers,
-    },
-  });
+async function request<T>(path: string): Promise<T> {
+  const response = await fetch(path, { headers: { Accept: 'application/json' } });
   if (!response.ok) {
     const body = await response.text();
     throw new Error(body || `${response.status} ${response.statusText}`);
@@ -18,28 +10,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  labBoard: () => request<{ count: number; tickets: LabTicket[] }>('/api/v1/lab/board'),
-  labRoi: (baselineMinutes = 240) => request<LabRoi>(`/api/v1/lab/roi?baseline_minutes=${baselineMinutes}`),
-  analytics: (days = 30) => request<Analytics>(`/api/v1/analytics?days=${days}&granularity=auto`),
+  overview: () => request<OverviewSummary>('/api/v1/overview/summary'),
+  violations: () => request<ViolationsSummary>('/api/v1/violations/summary'),
+  usage: () => request<UsageSummary>('/api/v1/usage/summary'),
+  rules: () => request<{ count: number; rules: RuleSummary[] }>('/api/v1/rules/summary'),
   events: (params = new URLSearchParams()) => request<{ count: number; events: GovernanceEvent[] }>(`/api/v1/events?${params}`),
   event: async (eventId: string) => (await request<{ event: GovernanceEvent }>(`/api/v1/events/${encodeURIComponent(eventId)}`)).event,
   facets: () => request<Facets>('/api/v1/facets'),
-  fleet: () => request<{ count: number; devices: FleetDevice[] }>('/api/v1/fleet'),
-  policies: () => request<PolicyCatalog>('/api/v1/policies'),
-  policyDraft: () => request<PolicyDraft>('/api/v1/policy/draft'),
-  saveDraft: (draft: PolicyDraft) => request<PolicyDraft>('/api/v1/policy/draft', {
-    method: 'PUT',
-    body: JSON.stringify({ expected_revision: draft.revision, config: policyConfig(draft) }),
-  }),
-  validatePolicy: (draft: PolicyDraft) => request<{ valid: boolean; errors?: Array<string | { path: string; message: string }> }>('/api/v1/policy/validate', {
-    method: 'POST',
-    body: JSON.stringify({ expected_revision: draft.revision, config: policyConfig(draft) }),
-  }),
-  publishPolicy: async (revision: string) => {
-    const result = await request<{ rollout: Rollout }>('/api/v1/policy/publish', {
-      method: 'POST', body: JSON.stringify({ expected_revision: revision }),
-    });
-    return result.rollout;
-  },
-  latestRollout: async () => (await request<{ rollout: Rollout | null }>('/api/v1/rollouts/latest')).rollout ?? { status: 'not_started' as const },
+  csvUrl: (params: URLSearchParams) => `/api/v1/events.csv?${params}`,
 };

@@ -62,8 +62,17 @@ def lab_board(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     blocks    = blocked events on the ticket, any role.
     ci        = first ci_result verdict decides first_try_pass; verdict and
                 findings come from the latest ci_result.
-    cost_credits = sum of lab_cost values (X-Lab-Cost header), null if none.
+    cost_credits = Bobcoins on the ticket (X-Lab-Cost header), null if none.
+                   A Stop event's cost is cumulative for its session, so it
+                   counts only its increase over the session maximum so far
+                   (see metrics.usage_deltas); other events count as sent.
     """
+    from .metrics import usage_deltas
+
+    ticket_costs: dict[str, list[float]] = defaultdict(list)
+    for record in usage_deltas(rows):
+        if record["ticket"] and record["bobcoins"] is not None:
+            ticket_costs[str(record["ticket"])].append(record["bobcoins"])
     tickets: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         if row.get("lab_ticket"):
@@ -96,7 +105,7 @@ def lab_board(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ci_runs = [item for item in items if _lab_kind(item) == "ci_result"]
         first_ci = (ci_runs[0].get("lab_data") or {}) if ci_runs else None
         last_ci = (ci_runs[-1].get("lab_data") or {}) if ci_runs else None
-        costs = [float(item["lab_cost"]) for item in items if item.get("lab_cost") is not None]
+        costs = ticket_costs.get(ticket, [])
         pr = next((item.get("lab_pr") for item in reversed(items) if item.get("lab_pr") is not None), None)
         merged_data = (merged.get("lab_data") or {}) if merged else {}
         started_at = started.get("occurred_at") if started else None

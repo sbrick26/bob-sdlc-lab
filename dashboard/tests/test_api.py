@@ -413,8 +413,10 @@ def test_product_ui_omits_infrastructure_and_demo_warnings():
     )
     for unwanted in ("Code Engine", "SimpleMDM", "Demo limitation", "Content handling", "Policy explanation"):
         assert unwanted not in compiled
-    assert "Enforcement over time" in compiled
-    assert "Users with highest exposure" in compiled
+    for wanted in ("Which rules blocked the most actions?", "Usage & ROI", "Download CSV", "Bobcoins per merged PR"):
+        assert wanted in compiled
+    for removed in ("IBM Bob", "Policy operations", "Publish policy"):
+        assert removed not in compiled
 
 
 def test_analytics_is_protected_and_returns_bounded_truthful_breakdowns():

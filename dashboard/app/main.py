@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import csv
 import hmac
+import io
 import hashlib
 import asyncio
 import json
@@ -15,7 +17,7 @@ from pathlib import PurePath
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -23,6 +25,7 @@ from pydantic import BaseModel, Field
 from . import db
 from . import lab
 from . import mdm
+from . import metrics
 from .policies import PACKAGE_ALLOWLIST, POLICY_VERSION, RULES, default_policy_config, prompt_rule_id, rule
 from .profile import build_profile
 from .storage import ObjectStoreUnavailable
@@ -174,6 +177,8 @@ def clean_event(body: dict[str, Any], *, allow_content: bool = False) -> dict[st
             event[field] = None if value is None else min(max(int(value), 0), 10_000_000)
         elif field == "lab_cost":
             event[field] = None if value is None else float(value)
+        elif field in {"lab_tokens", "lab_turns"}:
+            event[field] = None if value is None else min(max(int(value), 0), 10**12)
         elif field in {"prompt_content", "tool_input_content", "tool_output_content", "response_content"}:
             event[field] = str(value)[:MAX_CONTENT] if value is not None else None
         elif value is None:
@@ -465,6 +470,14 @@ def lab_cost(value: str | None) -> float | None:
     return round(cost, 6) if 0 <= cost < 1_000_000 else None
 
 
+def lab_count(value: str | None, maximum: int) -> int | None:
+    try:
+        number = int(float(str(value).strip()))
+    except (TypeError, ValueError):
+        return None
+    return number if 0 <= number <= maximum else None
+
+
 @app.get("/", response_class=HTMLResponse, dependencies=[Depends(require_dashboard)])
 def dashboard() -> Any:
     index = FRONTEND_DIST / "index.html"
@@ -528,6 +541,8 @@ async def ingest_hook(
     x_lab_role: str | None = Header(None, alias="X-Lab-Role"),
     x_lab_branch: str | None = Header(None, alias="X-Lab-Branch"),
     x_lab_cost: str | None = Header(None, alias="X-Lab-Cost"),
+    x_lab_tokens: str | None = Header(None, alias="X-Lab-Tokens"),
+    x_lab_turns: str | None = Header(None, alias="X-Lab-Turns"),
 ) -> dict[str, Any]:
     """Receive Bob's native hook envelope, decide centrally, and store a redacted record."""
     started = time.perf_counter_ns()
@@ -706,6 +721,8 @@ async def ingest_hook(
         "lab_role": lab_role(x_lab_role),
         "lab_branch": lab_branch(x_lab_branch),
         "lab_cost": lab_cost(x_lab_cost),
+        "lab_tokens": lab_count(x_lab_tokens, 10**12),
+        "lab_turns": lab_count(x_lab_turns, 1_000_000),
         "lab_path": tool_input_path(tool_input_raw),
     }
     db.insert_event(clean_event(event, allow_content=True))
@@ -720,12 +737,29 @@ def events(
     source: str | None = None, decision: str | None = None, rule: str | None = None,
     severity: str | None = None, event: str | None = None, tool: str | None = None,
     ticket: str | None = None, role: str | None = None,
+    since: str | None = None, until: str | None = None,
     q: str | None = None, limit: int = Query(250, ge=1, le=1000),
     sort: str = "time", direction: str = "desc",
 ) -> dict[str, Any]:
     filters = locals().copy()
     rows = db.query_events(filters, limit=limit, sort=sort, direction=direction)
     return {"count": len(rows), "events": rows}
+
+
+@app.get("/api/v1/events.csv", dependencies=[Depends(require_dashboard)])
+def events_csv(
+    user: str | None = None, ticket: str | None = None, event: str | None = None,
+    decision: str | None = None, since: str | None = None, until: str | None = None,
+) -> Response:
+    """Audit log export: metadata columns only, detail redacted and masked, no content."""
+    filters = {"user": user, "ticket": ticket, "event": event, "decision": decision, "since": since, "until": until}
+    buffer = io.StringIO()
+    csv.writer(buffer).writerows(metrics.csv_rows(db.filtered_events(filters), redact))
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
+    return Response(
+        buffer.getvalue(), media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="governance-audit-{stamp}.csv"'},
+    )
 
 
 @app.get("/api/v1/events/{event_id}", dependencies=[Depends(require_dashboard)])
@@ -1084,3 +1118,24 @@ def lab_board() -> dict[str, Any]:
 @app.get("/api/v1/lab/roi", dependencies=[Depends(require_dashboard)])
 def lab_roi(baseline_minutes: float = Query(240, gt=0, le=100_000)) -> dict[str, Any]:
     return lab.lab_roi(db.all_events(), baseline_minutes=baseline_minutes)
+
+
+@app.get("/api/v1/overview/summary", dependencies=[Depends(require_dashboard)])
+def overview_summary() -> dict[str, Any]:
+    return metrics.overview_summary(db.all_events())
+
+
+@app.get("/api/v1/violations/summary", dependencies=[Depends(require_dashboard)])
+def violations_summary(limit: int = Query(500, ge=1, le=2000)) -> dict[str, Any]:
+    return metrics.violations_summary(db.all_events(), redact, limit=limit)
+
+
+@app.get("/api/v1/usage/summary", dependencies=[Depends(require_dashboard)])
+def usage_summary() -> dict[str, Any]:
+    return metrics.usage_summary(db.all_events())
+
+
+@app.get("/api/v1/rules/summary", dependencies=[Depends(require_dashboard)])
+def rules_summary() -> dict[str, Any]:
+    enabled = {rule_id: bool(entry.get("enabled", True)) for rule_id, entry in runtime_rules().items()}
+    return metrics.rules_summary(db.all_events(), RULES, enabled)

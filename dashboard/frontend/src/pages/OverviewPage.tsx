@@ -1,93 +1,86 @@
-import { ArrowRight, Renew } from '@carbon/icons-react';
-import { LineChart, SimpleBarChart } from '@carbon/charts-react';
-import { Button, Dropdown, ProgressBar, Tag } from '@carbon/react';
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { GroupedBarChart, SimpleBarChart, StackedBarChart } from '@carbon/charts-react';
+import { Button } from '@carbon/react';
+import { Renew } from '@carbon/icons-react';
+import { useMemo } from 'react';
 import { api } from '../api';
-import { EventDetail } from '../components/EventDetail';
-import { EventTable } from '../components/EventTable';
+import { ChartPanel } from '../components/ChartPanel';
+import { RateNote, usdText } from '../components/Money';
 import { PageHeader } from '../components/PageHeader';
-import { PageError, PageLoading, EmptyState } from '../components/States';
+import { PageError, PageLoading } from '../components/States';
 import { StatCard } from '../components/StatCard';
-import { useApi } from '../hooks';
-import type { GovernanceEvent } from '../types';
+import { bobcoins, bucketLabel, count, minutes } from '../format';
+import { useApi, useUsdRate } from '../hooks';
+import { LABEL_AXIS, baseOptions, colorScale, countTicks, slot, useDarkMode } from '../theme';
 
-const ranges = [7, 30, 90];
+const ACTIVITY = ['Prompts', 'Tool calls', 'Blocks'];
 
 export function OverviewPage() {
-  const [days, setDays] = useState(30);
-  const [selected, setSelected] = useState<GovernanceEvent | null>(null);
-  const navigate = useNavigate();
-  const state = useApi(async () => {
-    const [analytics, events] = await Promise.all([api.analytics(days), api.events(new URLSearchParams({ limit: '20' }))]);
-    return { analytics, events: events.events };
-  }, [days]);
+  const dark = useDarkMode();
+  const state = useApi(api.overview, []);
+  const { rate, fromBrowser } = useUsdRate(state.data?.usd_rate);
+  const data = state.data;
 
-  const decisionData = useMemo(() => state.data?.analytics.timeline.flatMap((bucket) => [
-    { group: 'Blocked', date: new Date(bucket.bucket), value: bucket.blocked },
-    { group: 'Allowed', date: new Date(bucket.bucket), value: bucket.allowed },
-  ]) ?? [], [state.data]);
-  const ruleData = useMemo(() => state.data?.analytics.rules.slice(0, 6).map((rule) => ({ group: 'Findings', key: rule.rule_name || rule.rule_id, value: rule.total })) ?? [], [state.data]);
+  const charts = useMemo(() => {
+    if (!data) return null;
+    const label = (bucket: string) => bucketLabel(bucket, data.granularity);
+    const buckets = data.activity.map((item) => item.bucket);
+    const spendKeys = new Set(data.bobcoins_by_user.map((item) => item.bucket));
+    const firstUser = data.users[0] ?? 'unknown';
+    const spend = [
+      ...data.bobcoins_by_user.map((item) => ({ group: item.user, key: label(item.bucket), value: item.bobcoins })),
+      ...buckets.filter((bucket) => !spendKeys.has(bucket)).map((bucket) => ({ group: firstUser, key: label(bucket), value: 0 })),
+    ];
+    const order = buckets.map(label);
+    // Bucket order first, then the stable user order, so the legend matches the colors.
+    spend.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key) || data.users.indexOf(a.group) - data.users.indexOf(b.group));
+    const activity = data.activity.flatMap((item) => [
+      { group: 'Prompts', key: label(item.bucket), value: item.prompts },
+      { group: 'Tool calls', key: label(item.bucket), value: item.tool_calls },
+      { group: 'Blocks', key: label(item.bucket), value: item.blocks },
+    ]);
+    const merge = data.time_to_merge.map((item) => ({ group: 'Minutes to merge', key: `${item.ticket} · ${item.user}`, value: item.minutes }));
+    const rules = data.violations_by_rule.filter((item) => item.blocked > 0).map((item) => ({ group: 'Blocked', key: item.rule_name || item.rule_id, value: item.blocked }));
+    return { spend, order, activity, merge, rules };
+  }, [data]);
 
-  if (state.loading) return <PageLoading />;
-  if (state.error || !state.data) return <PageError error={state.error || new Error('No analytics returned')} retry={state.reload} />;
-  const { analytics, events } = state.data;
-  const highSignal = events.filter((event) => event.decision !== 'allowed').slice(0, 8);
-  const recent = highSignal.length ? highSignal : events.slice(0, 8);
-  const toolLatency = analytics.overall.avg_tool_duration_ms;
+  if (state.loading && !data) return <PageLoading />;
+  if (state.error || !data || !charts) return <PageError error={state.error || new Error('No summary returned')} retry={state.reload} />;
+  const k = data.kpis;
+  const period = data.granularity === 'hour' ? 'hour' : 'day';
+  const usersScale = colorScale(data.users, dark);
+  const one = (name: string) => ({ scale: { [name]: slot(0, dark) } });
 
   return (
     <>
-      <PageHeader eyebrow="Governance posture" title="Decisions that need attention" description="Enforcement activity across people, tools, and managed policy controls." actions={
-        <><Dropdown id="overview-range" label="Reporting period" titleText="Period" items={ranges} selectedItem={days} itemToString={(item) => item ? `Last ${item} days` : ''} onChange={({ selectedItem }) => setDays(selectedItem ?? 30)} size="sm" /><Button kind="ghost" size="sm" renderIcon={Renew} onClick={state.reload}>Refresh</Button></>
-      } />
+      <PageHeader eyebrow="Bob usage and governance" title="Overview" description="How much the team uses Bob, what it costs, how fast tickets reach a merged PR, and what the controls blocked." actions={<Button kind="ghost" size="sm" renderIcon={Renew} onClick={state.reload}>Refresh</Button>} />
 
-      <section className="kpi-grid" aria-label="Governance posture summary">
-        <StatCard label="Evaluated actions" value={analytics.overall.enforceable_total.toLocaleString()} detail="Prompts and tool requests evaluated before execution" />
-        <StatCard label="Blocked" value={analytics.overall.blocked.toLocaleString()} detail={`${analytics.overall.blocked_rate_pct}% of enforceable actions`} signal={analytics.overall.blocked > 0 ? 'negative' : 'positive'} />
-        <StatCard label="Affected users" value={analytics.overall.users_with_blocks.toLocaleString()} detail={`${analytics.overall.reporting_users} active users · ${analytics.overall.reporting_devices} devices`} />
-        <StatCard label="Evaluation time" value={analytics.overall.avg_policy_duration_ms == null ? '—' : `${analytics.overall.avg_policy_duration_ms} ms`} detail={`${analytics.overall.policy_duration_samples.toLocaleString()} measured evaluations`} />
+      <section className="kpi-grid kpi-grid--auto" aria-label="Key numbers">
+        <StatCard label="Active users" value={count(k.active_users)} detail="People with Bob hook events" />
+        <StatCard label="Bob sessions" value={count(k.sessions)} detail="Distinct Bob sessions" />
+        <StatCard label="Prompts" value={count(k.prompts)} detail={`${count(k.tool_calls)} tool calls`} />
+        <StatCard label="Bobcoin spend" value={bobcoins(k.bobcoins)} detail={k.bobcoins == null ? 'No usage reported yet' : usdText(k.bobcoins, rate)} />
+        <StatCard label="Context tokens" value={count(k.tokens)} detail="Sum of per-turn context size" />
+        <StatCard label="Violations blocked" value={count(k.blocked)} detail="Stopped before the model or tool ran" signal={k.blocked ? 'negative' : 'neutral'} />
+        <StatCard label="PRs merged" value={count(k.prs_merged)} detail="Tickets with a merge event" signal={k.prs_merged ? 'positive' : 'neutral'} />
+        <StatCard label="Median start to merge" value={minutes(k.median_minutes_to_merge)} detail="Ticket start to merged PR" />
+        <StatCard label="Bobcoins per merged PR" value={bobcoins(k.bobcoins_per_merged_pr)} detail={k.bobcoins_per_merged_pr == null ? 'No merged PR with usage yet' : usdText(k.bobcoins_per_merged_pr, rate)} />
       </section>
+      <RateNote rate={rate} basis={data.usd_rate_basis} fromBrowser={fromBrowser} />
 
-      <section className="overview-grid">
-        <article className="panel panel--wide">
-          <div className="panel__header"><div><p className="eyebrow">Decision volume</p><h2>Enforcement over time</h2></div><Tag size="sm" type="gray">{analytics.window.granularity}</Tag></div>
-          {decisionData.length ? <LineChart data={decisionData} options={{ height: '310px', theme: 'g10', axes: { bottom: { mapsTo: 'date', scaleType: 'time' }, left: { mapsTo: 'value', scaleType: 'linear', title: 'Actions' } }, curve: 'curveMonotoneX', points: { enabled: false }, legend: { alignment: 'center' }, toolbar: { enabled: false }, animations: false } as never} /> : <EmptyState title="No decisions yet" detail="Activity appears after the first policy evaluation." />}
-        </article>
-        <article className="panel">
-          <div className="panel__header"><div><p className="eyebrow">Control impact</p><h2>Top violated rules</h2></div></div>
-          {ruleData.length ? <SimpleBarChart data={ruleData} options={{ height: '310px', theme: 'g10', axes: { left: { mapsTo: 'key', scaleType: 'labels' }, bottom: { mapsTo: 'value', scaleType: 'linear' } }, legend: { enabled: false }, toolbar: { enabled: false }, animations: false } as never} /> : <EmptyState title="No rule violations" detail="The selected period has no findings." />}
-        </article>
+      <section className="chart-grid">
+        <ChartPanel eyebrow="Spend" question={`Who spent the Bobcoins, per ${period}?`} note={`${period === "day" ? "Days" : "Hours"} in UTC. A session's spend is placed at the Stop events that reported it.`} empty={!charts.spend.some((item) => item.value > 0)} emptyDetail="Spend appears after Bob sends a Stop event with a session cost.">
+          <StackedBarChart data={charts.spend} options={{ ...baseOptions(dark), axes: { left: { mapsTo: 'value', stacked: true, title: 'Bobcoins (BC)' }, bottom: { mapsTo: 'key', scaleType: 'labels', domain: charts.order } }, color: { scale: usersScale } } as never} />
+        </ChartPanel>
+        <ChartPanel eyebrow="Activity" question={`How much did people use Bob, per ${period}?`} note={`${period === "day" ? "Days" : "Hours"} in UTC.`} empty={!charts.activity.some((item) => item.value > 0)}>
+          <GroupedBarChart data={charts.activity} options={{ ...baseOptions(dark), axes: { bottom: { mapsTo: 'key', scaleType: 'labels', domain: charts.order }, left: { mapsTo: 'value', title: 'Events (count)' } }, color: { scale: colorScale(ACTIVITY, dark) } } as never} />
+        </ChartPanel>
+        <ChartPanel eyebrow="Delivery" question="How long did each ticket take from start to merge?" empty={!charts.merge.length} emptyDetail="Bars appear when a ticket has a merge event.">
+          <SimpleBarChart data={charts.merge} options={{ ...baseOptions(dark), axes: { left: { mapsTo: 'key', ...LABEL_AXIS }, bottom: { mapsTo: 'value', title: 'Minutes, start to merge' } }, legend: { enabled: false }, color: one('Minutes to merge') } as never} />
+        </ChartPanel>
+        <ChartPanel eyebrow="Controls" question="Which rules blocked the most actions?" empty={!charts.rules.length} emptyDetail="No action has been blocked yet.">
+          <SimpleBarChart data={charts.rules} options={{ ...baseOptions(dark), axes: { left: { mapsTo: 'key', ...LABEL_AXIS }, bottom: { mapsTo: 'value', title: 'Blocked actions (count)', ...countTicks(Math.max(0, ...charts.rules.map((item) => item.value))) } }, legend: { enabled: false }, color: one('Blocked') } as never} />
+        </ChartPanel>
       </section>
-
-      <section className="overview-grid overview-grid--lower">
-        <article className="panel">
-          <div className="panel__header"><div><p className="eyebrow">People</p><h2>Users with highest exposure</h2></div><Button kind="ghost" size="sm" renderIcon={ArrowRight} onClick={() => navigate('/users')}>View users</Button></div>
-          <div className="rank-list">
-            {analytics.top_users.slice(0, 6).map((user) => (
-              <div className="rank-row" key={user.user_name}>
-                <div><strong>{user.user_name}</strong><span>{user.blocked} blocked of {user.enforceable_total} evaluated</span></div>
-                <div className="rank-row__meter"><span>{user.blocked_rate_pct ?? 0}%</span><ProgressBar value={user.blocked_rate_pct ?? 0} max={100} size="small" label={`${user.user_name} block rate`} hideLabel /></div>
-              </div>
-            ))}
-            {!analytics.top_users.length && <EmptyState title="No active users" detail="User activity will appear here." />}
-          </div>
-        </article>
-        <article className="panel">
-          <div className="panel__header"><div><p className="eyebrow">Tool performance</p><h2>Observed tool duration</h2></div></div>
-          <div className="latency-hero"><strong>{toolLatency == null ? 'Not measured' : `${toolLatency} ms`}</strong><span>Average across {analytics.overall.tool_duration_samples.toLocaleString()} paired tool measurements</span></div>
-          <div className="tool-list">
-            {analytics.tools.filter((tool) => tool.duration_samples > 0).slice(0, 5).map((tool) => <div key={tool.tool_name}><span>{tool.tool_name}</span><strong>{tool.avg_tool_duration_ms} ms</strong><small>{tool.duration_samples} samples</small></div>)}
-            {!analytics.tools.some((tool) => tool.duration_samples > 0) && <p className="muted">No paired tool measurements in this period.</p>}
-          </div>
-        </article>
-      </section>
-
-      <section className="panel activity-preview">
-        <div className="panel__header"><div><p className="eyebrow">Recent activity</p><h2>{highSignal.length ? 'Findings and blocks' : 'Latest decisions'}</h2></div><Button kind="ghost" size="sm" renderIcon={ArrowRight} onClick={() => navigate('/activity')}>Open activity</Button></div>
-        <EventTable events={recent} onSelect={setSelected} compact />
-      </section>
-      {selected && <EventDetail event={selected} onClose={() => setSelected(null)} />}
     </>
   );
 }

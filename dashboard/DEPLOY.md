@@ -28,6 +28,7 @@
 | `COS_BUCKET`, `COS_ENDPOINT`, `COS_PREFIX` | cos | IBM Cloud Object Storage target. |
 | `COS_API_KEY`, `COS_RESOURCE_INSTANCE_ID` | cos | COS credentials, from a secret (or a service binding). |
 | `PORT` | no | Set by Code Engine. The image listens on `${PORT:-8080}`. |
+| `BOBCOIN_USD_RATE` | no | USD per Bobcoin for the USD columns. Default `0.50` (IBM enterprise pack price); `off` hides USD. |
 | `SIMPLEMDM_API_KEY` | no | Only when `LAB_MODE` is off and policy publish must reach MDM. |
 
 ## Commands

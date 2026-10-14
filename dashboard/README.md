@@ -4,9 +4,12 @@ This folder is the Bob SDLC lab dashboard. It is the Bob Governance service
 (below) with lab additions:
 
 - **Lab headers** on every hook event: `X-Lab-Ticket` (for example `KAN-201`),
-  `X-Lab-Role` (`participant`, `ci-reviewer`, `guide`), `X-Lab-Branch`, and an
-  optional `X-Lab-Cost` (usage credits). Ticket and role are filters and facets
-  in `/api/v1/events` and `/api/v1/facets`.
+  `X-Lab-Role` (`participant`, `ci-reviewer`, `guide`), `X-Lab-Branch`, and on
+  Stop events `X-Lab-Cost` (Bobcoins), `X-Lab-Tokens` (context tokens) and
+  `X-Lab-Turns`, each cumulative for the Bob session. Session usage is the
+  maximum value seen per session, then summed per person, ticket and day
+  (`app/metrics.py`). Ticket and role are filters and facets in
+  `/api/v1/events` and `/api/v1/facets`.
 - **Lab events** from outside Bob (GitHub, CI): `POST /api/v1/lab/events`
   with `Authorization: Bearer <INGEST_TOKEN>` and
   `{"kind", "user", "ticket", "pr", "data"}`. Kinds: `pr_opened`, `ci_result`,
@@ -23,7 +26,16 @@ This folder is the Bob SDLC lab dashboard. It is the Bob Governance service
   `GOV-GIT-001` blocks unsafe git commands.
 - **`LAB_MODE=1`**: policy publish activates the policy in the object store
   without MDM. Dashboard basic auth still applies.
-- **Lab page**: the first item in the console navigation.
+- **Console pages**: Overview, Violations, Audit log, Usage & ROI, Rules
+  (read only). Each page reads one summary endpoint:
+  `/api/v1/overview/summary`, `/api/v1/violations/summary`,
+  `/api/v1/usage/summary`, `/api/v1/rules/summary`. The audit log exports
+  `/api/v1/events.csv` (same filters as `/api/v1/events` plus `since` and
+  `until`; metadata columns only, detail redacted). The policy draft and
+  publish API stays, but the console no longer links it.
+- **USD**: USD = Bobcoins x `BOBCOIN_USD_RATE` (default `0.50`, the IBM
+  enterprise pack price of $500 per 1,000 Bobcoins; `off` turns USD off). The
+  Usage & ROI page can override the rate in the browser.
 - **Install-rule parsing**: a command segment that `shlex` cannot parse is a `GOV-PKG-001` block only when it looks like an install (`pip`, `npm`, `pnpm`, `yarn`, `python -m pip`); other segments, such as `echo 'a|b'`, are ignored.
 - **Reset**: `.venv/bin/python scripts/reset-lab.py` deletes every object under `COS_PREFIX` in the local store (`DATA_DIR/objects`) and prints each one; in COS mode it only prints the `ibmcloud cos` delete command.
 
@@ -31,7 +43,7 @@ This folder is the Bob SDLC lab dashboard. It is the Bob Governance service
 
 ```bash
 ./run-local.sh                         # http://localhost:8080  user governance  password lab
-.venv/bin/python scripts/seed-lab.py   # four-person demo run (sam, priya, jordan, alex)
+.venv/bin/python scripts/seed-lab.py   # four people, eight tickets over four days
 curl -u governance:lab localhost:8080/api/v1/lab/board
 ```
 
@@ -62,8 +74,8 @@ versions, and roll the managed configuration to Bob devices through MDM.
 - Python and Node.js package installation allowlists
 - Redacted prompt, tool input/output, response, latency, user, device, profile,
   rule, and outcome telemetry
-- React and Carbon administration experience for Overview, Activity, Users,
-  and Policies
+- React and Carbon console for Overview, Violations, Audit log, Usage & ROI,
+  and Rules
 - Versioned policy drafts with validation, optimistic revision checks,
   publishing, and rollout history
 - Managed-profile update and assignment-group synchronization from the server

@@ -1,28 +1,32 @@
+import { Theme } from '@carbon/react';
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { PageLoading } from './components/States';
+import { useDarkMode } from './theme';
 
-const LabPage = lazy(() => import('./pages/LabPage').then((module) => ({ default: module.LabPage })));
 const OverviewPage = lazy(() => import('./pages/OverviewPage').then((module) => ({ default: module.OverviewPage })));
-const ActivityPage = lazy(() => import('./pages/ActivityPage').then((module) => ({ default: module.ActivityPage })));
-const UsersPage = lazy(() => import('./pages/UsersPage').then((module) => ({ default: module.UsersPage })));
-const PoliciesPage = lazy(() => import('./pages/PoliciesPage').then((module) => ({ default: module.PoliciesPage })));
+const ViolationsPage = lazy(() => import('./pages/ViolationsPage').then((module) => ({ default: module.ViolationsPage })));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage').then((module) => ({ default: module.AuditLogPage })));
+const UsagePage = lazy(() => import('./pages/UsagePage').then((module) => ({ default: module.UsagePage })));
+const RulesPage = lazy(() => import('./pages/RulesPage').then((module) => ({ default: module.RulesPage })));
 
 export function App() {
+  const dark = useDarkMode();
   return (
-    <Suspense fallback={<PageLoading />}>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={<Navigate to="/lab" replace />} />
-          <Route path="lab" element={<LabPage />} />
-          <Route path="overview" element={<OverviewPage />} />
-          <Route path="activity" element={<ActivityPage />} />
-          <Route path="users" element={<UsersPage />} />
-          <Route path="policies" element={<PoliciesPage />} />
-          <Route path="*" element={<Navigate to="/lab" replace />} />
-        </Route>
-      </Routes>
-    </Suspense>
+    <Theme theme={dark ? 'g100' : 'g10'} className={`theme-root${dark ? ' theme-root--dark' : ''}`}>
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route index element={<OverviewPage />} />
+            <Route path="violations" element={<ViolationsPage />} />
+            <Route path="audit" element={<AuditLogPage />} />
+            <Route path="usage" element={<UsagePage />} />
+            <Route path="rules" element={<RulesPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </Suspense>
+    </Theme>
   );
 }

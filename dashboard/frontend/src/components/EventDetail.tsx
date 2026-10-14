@@ -2,6 +2,7 @@ import { Close, Copy } from '@carbon/icons-react';
 import { Button } from '@carbon/react';
 import type { GovernanceEvent } from '../types';
 import { DecisionTag } from './DecisionTag';
+import { bobcoins, count } from '../format';
 
 const sections = [
   ['Prompt', 'prompt_content'],
@@ -17,7 +18,7 @@ export function EventDetail({ event, onClose }: { event: GovernanceEvent; onClos
       <aside className="event-drawer" role="dialog" aria-modal="true" aria-labelledby="event-drawer-title">
         <header className="event-drawer__header">
           <div>
-            <p className="eyebrow">Decision record</p>
+            <p className="eyebrow">Event detail</p>
             <h2 id="event-drawer-title">{event.rule_name || event.hook_event}</h2>
           </div>
           <Button kind="ghost" size="sm" hasIconOnly renderIcon={Close} iconDescription="Close details" onClick={onClose} />
@@ -39,6 +40,9 @@ export function EventDetail({ event, onClose }: { event: GovernanceEvent; onClos
             {event.lab_branch && <div><dt>Branch</dt><dd>{event.lab_branch}</dd></div>}
             {event.lab_path && <div><dt>File</dt><dd>{event.lab_path}</dd></div>}
             {event.lab_pr != null && <div><dt>Pull request</dt><dd>#{event.lab_pr}</dd></div>}
+            {event.lab_cost != null && <div><dt>Session Bobcoins (cumulative)</dt><dd>{bobcoins(event.lab_cost)}</dd></div>}
+            {event.lab_tokens != null && <div><dt>Session context tokens</dt><dd>{count(event.lab_tokens)}</dd></div>}
+            {event.lab_turns != null && <div><dt>Session turns</dt><dd>{count(event.lab_turns)}</dd></div>}
             <div><dt>Outcome</dt><dd>{event.outcome?.replaceAll('_', ' ') || '—'}</dd></div>
           </dl>
           {(event.detail || event.evidence) && <section className="detail-block"><h3>Finding</h3><p>{event.detail || event.evidence}</p></section>}
