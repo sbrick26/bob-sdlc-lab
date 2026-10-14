@@ -16,10 +16,7 @@ Then open the folder in Bob IDE and say: `check my tickets`
 | Doc | For |
 |---|---|
 | [Participant guide](docs/participant-guide.md) | the 60-minute lab, step by step |
-| [Facilitator notes](docs/facilitator-notes.md) | the guide: checklist, script, reset |
-| [Cards](docs/cards.md) | one printable card per participant |
 | [Architecture](docs/architecture.md) | diagram and stage-to-control map |
-| [Enterprise](docs/enterprise/README.md) | enforced hooks and MCP gateway |
 
 ## Repo map
 
@@ -27,7 +24,6 @@ Then open the folder in Bob IDE and say: `check my tickets`
 |---|---|
 | `.bob/` | the bob-sdlc plugin (modes, skills, rules, MCP), hook settings, hooks |
 | `.github/` | the sdlc-gate CI workflow, PR template, CODEOWNERS |
-| `dashboard/` | the governance dashboard (Lab, Activity, Users pages) |
 | `data/` | FieldOps work orders and crews (CSV) |
 | `docs/` | lab documents |
 | `fieldops/` | the old system the tickets change |
@@ -51,6 +47,6 @@ Then open the folder in Bob IDE and say: `check my tickets`
    - `atlassian`: the hosted Atlassian MCP server with OAuth. Each user signs in once in the browser.
    - `atlassian-token`: a local server that uses `JIRA_URL`, `JIRA_USERNAME` and `JIRA_API_TOKEN` from the environment.
    - Your own MCP server for another ticket system. The skills name the Jira actions they need (search, read, change status, comment); map them in `skills/tickets/SKILL.md`.
-5. Copy `.github/workflows/sdlc-gate.yml` and `tools/ci/` for the CI gate, set the secrets, then run `tools/ci/protect-main.sh` once as a repo admin.
+5. Copy `.github/workflows/sdlc-gate.yml` and `tools/ci/` for the CI gate, set the secrets, then protect the main branch: required checks tests, protected-paths, bob-review and one approving review.
 
 Hooks are a speed bump. CI and branch protection are the real controls.

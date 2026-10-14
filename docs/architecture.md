@@ -40,8 +40,8 @@ flowchart LR
 | Push and PR | `gh pr create`, PR template | `.bob/hooks/pr_gate.py`, `governance/pr-checklist.yaml`, `.github/pull_request_template.md` | PR gate refuses the push in one sentence |
 | Review | mode `SDLC Review`, skill `/review`, headless `bob run` | `.github/workflows/sdlc-gate.yml`, `skills/review/SKILL.md`, `rules-sdlc-review/review-output.md` | CI job `bob-review`, rules pinned to main, fails closed without a verdict |
 | Protect the platform | rule `05-protected-paths.md` | `tools/ci/protected_paths.py`, `.github/CODEOWNERS` | CI job `protected-paths` |
-| Merge | GitHub merge | `tools/ci/protect-main.sh` | Branch protection: tests, protected-paths, bob-review green, one approving review |
-| Close and measure | CI job `merged` | `tools/ci/jira_transition.py`, `dashboard/` | Ticket to Done; dashboard Lab page |
+| Merge | GitHub merge | GitHub branch protection | Branch protection: tests, protected-paths, bob-review green, one approving review |
+| Close and measure | CI job `merged` | `tools/ci/jira_transition.py`, governance dashboard | Ticket to Done; dashboard Delivery page |
 | Change the rules | skill `/new-check` | `skills/new-check/SKILL.md` | Protected path, platform PR, owner review |
 
 Hooks fail open. If the dashboard is down, Bob continues. CI and branch protection are the controls that hold. For enforced hooks and an MCP gateway, see [docs/enterprise](enterprise/README.md).

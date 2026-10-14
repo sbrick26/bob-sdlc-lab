@@ -112,7 +112,7 @@ Bob never picks a ticket assigned to someone else.
    | Job | What it does |
    |---|---|
    | tests | runs `python -m pytest -q` |
-   | protected-paths | fails if the PR touches `.bob/`, `.github/`, `governance/`, `tools/` or `dashboard/` |
+   | protected-paths | fails if the PR touches `.bob/`, `.github/`, `governance/` or `tools/` |
    | bob-review | Bob in `SDLC Review` mode judges the diff against your plan, with the rules taken from main |
 
 3. bob-review posts one PR comment with a verdict block: `VERDICT`, `CRITERIA`, `FINDINGS`, `RULES`, `TESTS`. No verdict means fail.
@@ -138,7 +138,7 @@ Then open Activity (every event, with the rule that fired) and Users (activity b
 
 - One governed path: ticket, plan, approval, tests, review, merge. Each stage has a mode with only the tools it needs.
 - The same plugin works in your repo. See the root [README](../README.md), "Reuse this in your own repo".
-- Hooks are a speed bump. They fail open. CI and branch protection are the real controls. See [docs/enterprise](enterprise/README.md).
+- Hooks are a speed bump. They fail open. CI and branch protection are the real controls.
 
 ## If something goes wrong
 
