@@ -1,6 +1,7 @@
 ---
 name: new-check
-description: Add a new item to the PR checklist that the pr-gate hook enforces on every push. Use when someone says "every PR must also ...". Stretch exercise for the lab.
+description: >-
+  Add a new item to the PR checklist that the pr-gate hook enforces on every push. Use when someone says "every PR must also ...". Stretch exercise for the lab.
 metadata:
   user-invocable: true
 ---

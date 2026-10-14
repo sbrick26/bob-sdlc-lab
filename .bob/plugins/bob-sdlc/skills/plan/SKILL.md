@@ -1,6 +1,7 @@
 ---
 name: plan
-description: Plan a ticket: ask the user the design questions, write the spec plans/<KEY>.md with the answers and any open questions, review it in chat, and on "I approve" post it to Jira and move the ticket to In Review for the requester. Used by the tickets skill at stage 2, or directly with /plan <KEY> to re-plan.
+description: >-
+  Plan a ticket: ask the user the design questions, write the spec plans/<KEY>.md with the answers and any open questions, review it in chat, and on "I approve" post it to Jira and move the ticket to In Review for the requester. Used by the tickets skill at stage 2, or directly with /plan <KEY> to re-plan.
 metadata:
   user-invocable: true
   argument-hint: <TICKET-KEY>

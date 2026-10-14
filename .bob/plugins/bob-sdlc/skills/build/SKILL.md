@@ -1,6 +1,7 @@
 ---
 name: build
-description: Build an approved ticket: tests first, code, self-review, pull request to demo-dev, Jira update. Used by the tickets skill at stage 4, or directly with /build <KEY>.
+description: >-
+  Build an approved ticket: tests first, code, self-review, pull request to demo-dev, Jira update. Used by the tickets skill at stage 4, or directly with /build <KEY>.
 metadata:
   user-invocable: true
   argument-hint: <TICKET-KEY>

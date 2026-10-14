@@ -55,7 +55,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install
-        run: pip install -r requirements.txt pytest
+        run: pip install -r requirements.txt pytest pyyaml
       - name: Run pytest
         id: pytest
         run: |
@@ -147,7 +147,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python dependencies (the reviewer runs the tests)
-        run: pip install -r requirements.txt pytest
+        run: pip install -r requirements.txt pytest pyyaml
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4

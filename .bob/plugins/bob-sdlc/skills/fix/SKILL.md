@@ -1,6 +1,7 @@
 ---
 name: fix
-description: Fix a pull request after CI or a reviewer found problems: read the findings, fix them, rerun the tests, push. Used by the tickets skill at stage 5, or when the user says "fix it" or "fix the PR".
+description: >-
+  Fix a pull request after CI or a reviewer found problems: read the findings, fix them, rerun the tests, push. Used by the tickets skill at stage 5, or when the user says "fix it" or "fix the PR".
 metadata:
   user-invocable: true
   argument-hint: <TICKET-KEY>

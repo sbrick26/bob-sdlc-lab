@@ -1,6 +1,7 @@
 ---
 name: tickets
-description: "Check my tickets": find the user's Jira ticket, work out its stage from Jira and GitHub, and continue with the right skill (plan, build or fix) in the same turn. Use when the user says "check my tickets", asks what to work on, or starts a new chat.
+description: >-
+  "Check my tickets": find the user's Jira ticket, work out its stage from Jira and GitHub, and continue with the right skill (plan, build or fix) in the same turn. Use when the user says "check my tickets", asks what to work on, or starts a new chat.
 metadata:
   user-invocable: true
 ---

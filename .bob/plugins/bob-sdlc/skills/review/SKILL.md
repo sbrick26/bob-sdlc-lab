@@ -1,6 +1,7 @@
 ---
 name: review
-description: Review a branch or diff against its plan, the rules and the PR checklist, run the tests, and print the verdict block. Used by CI headless and by people in the Review mode or with /review.
+description: >-
+  Review a branch or diff against its plan, the rules and the PR checklist, run the tests, and print the verdict block. Used by CI headless and by people in the Review mode or with /review.
 metadata:
   user-invocable: true
   argument-hint: [TICKET-KEY]
