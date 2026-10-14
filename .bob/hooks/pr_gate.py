@@ -13,7 +13,7 @@ cmd = str(ti.get("command", ""))
 
 # Protected paths: no edits under .bob/, .github/, governance/, tools/ from a ticket session, and no
 # shell writes into .bob/run (the test marker). The marker must come from a real pytest run.
-PROTECTED = (".bob/", ".github/", "governance/", "tools/")
+PROTECTED = (".bob/", ".github/", "governance/")
 path = str(ti.get("path") or ti.get("file_path") or "")
 if tool in ("write_file", "apply_diff", "insert_content", "search_and_replace") and re.sub(r"^(\./)+", "", path).startswith(PROTECTED):
     print("Protected path: %s is changed only in a platform PR, not in a ticket branch." % path, file=sys.stderr); sys.exit(2)

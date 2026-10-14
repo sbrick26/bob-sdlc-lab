@@ -1,6 +1,6 @@
 # Bob SDLC Lab
 
-One hour, one old system, four tickets, the governed way. FieldOps is the work-order system of a fictional utility: built in 2010, no tests. Four people each take one Jira ticket and use Bob IDE to plan it, get the plan approved, build it tests first and open a pull request. CI reviews the change against the plan, a person approves it, and a dashboard shows each step, each block and the cost per merged PR.
+**Governed AI Delivery with IBM Bob.** Take a Jira ticket on an old field-service system from backlog to merged pull request. One Bob plugin carries the whole process: plan, build, review. Guardrails keep every step safe, and a dashboard shows usage, violations and cost per merged PR.
 
 ## Start
 
@@ -9,44 +9,46 @@ git clone https://github.com/sbrick26/bob-sdlc-lab.git
 cd bob-sdlc-lab && ./setup.sh      # Windows: powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
-Then open the folder in Bob IDE and say: `check my tickets`
+Setup asks which lab profile is yours and for the dashboard token on your card. Then, in Bob IDE, pick the **SDLC Agent** mode and say: `check my tickets`. The [participant guide](docs/participant-guide.md) walks through the hour.
 
-## Docs
+## The process, and the Bob feature behind each step
 
-| Doc | For |
-|---|---|
-| [Participant guide](docs/participant-guide.md) | the 60-minute lab, step by step |
-| [Architecture](docs/architecture.md) | diagram and stage-to-control map |
+| SDLC step | What happens | Bob feature | In this repo | Bob docs |
+|---|---|---|---|---|
+| Pick up work | "check my tickets" finds your Jira ticket and works out its stage | Custom mode **SDLC Agent** + skill `tickets` + MCP server | `.bob/plugins/bob-sdlc/custom_modes.yaml`, `skills/tickets/`, `rules-sdlc/stages.md`, `mcp.json` | [Custom modes](https://bob.ibm.com/docs/ide/configuration/custom-modes), [Skills](https://bob.ibm.com/docs/ide/features/skills), [MCP](https://bob.ibm.com/docs/ide/configuration/mcp/mcp-in-bob) |
+| Sign in to Jira as yourself | First Jira call opens the browser; Bob acts with your permissions | Remote MCP server with OAuth | `mcp.json` entry `atlassian` | [MCP OAuth](https://bob.ibm.com/docs/ide/configuration/mcp/mcp-oauth) |
+| Plan and spec | Design questions, then `plans/<KEY>.md`; review in chat, then on the ticket | Mode **SDLC Plan** (can edit only `plans/`), skill `plan`, mode rules | `skills/plan/`, `rules-sdlc-plan/plan-format.md` | [Custom modes](https://bob.ibm.com/docs/ide/configuration/custom-modes), [Rules](https://bob.ibm.com/docs/ide/configuration/rules) |
+| Approval | Requester comments "Approved" on the Jira ticket | MCP (Jira comments) | `rules-sdlc/stages.md` | |
+| Build, tests first | Branch, tests, code, change note, self-review, pull request | Mode **SDLC Build**, skill `build`, subagent self-review | `skills/build/`, `rules-sdlc-build/build-order.md` | [Subagents](https://bob.ibm.com/docs/ide/features/subagents) |
+| Team standards | Secrets, personal data, approved libraries, git discipline, protected paths | Rules | `.bob/plugins/bob-sdlc/rules/` | [Rules](https://bob.ibm.com/docs/ide/configuration/rules) |
+| Guardrails as it works | Every prompt and action is checked; violations are blocked before they run | Lifecycle hooks | `.bob/settings.json`, `.bob/hooks/` | [Lifecycle hooks](https://bob.ibm.com/docs/ide/configuration/lifecycle-hooks) |
+| Ready-to-merge checklist | A push or PR is refused until the spec is approved, tests passed and the change note exists | PreToolUse hook | `.bob/hooks/pr_gate.py`, `governance/pr-checklist.yaml` | [Lifecycle hooks](https://bob.ibm.com/docs/ide/configuration/lifecycle-hooks) |
+| Review in CI | Tests, protected paths, and Bob reviewing the diff against the spec | Bob Shell headless + mode **SDLC Review** | `.github/workflows/sdlc-gate.yml`, `.github/scripts/` | [Headless Bob Shell](https://bob.ibm.com/docs/shell/getting-started/start-bobshell-non-interactive) |
+| Fix findings | "check my tickets" sees the failed review and fixes it | Skill `fix` in SDLC Build | `skills/fix/` | |
+| Merge and close | A person approves; merge moves the Jira ticket to Done | GitHub branch protection + CI job | `sdlc-gate.yml` (job `merged`) | |
+| Governance rules | Which rules block, their text, allowlists; changed by PR to main | Rules file read by the governance service | `governance/rules.yaml` | |
+| Visibility and ROI | Usage, Bobcoins, violations, time to merge, cost per merged PR, audit log | Hooks report to the governance dashboard | `.bob/hooks/gov.py` | |
+| Packaging | All of the above ships as one folder | Bob plugin | `.bob/plugins/bob-sdlc/` | [IDE changelog 2.2.0: plugins](https://bob.ibm.com/docs/ide/changelog) |
+| Make it mandatory | An admin pushes the hooks to every managed machine | Group policy `EnforcedHooks` | | [Group policies](https://bob.ibm.com/docs/ide/security/group-policies) |
+
+Hooks are a speed bump: if one fails, the action still runs. CI and branch protection are the real controls.
+
+## Build your own
+
+1. Copy `.bob/plugins/bob-sdlc`, `.bob/settings.json`, `.bob/hooks` and `governance/` into your repo.
+2. Edit the rules in `.bob/plugins/bob-sdlc/rules/` and `governance/rules.yaml` for your team.
+3. Point `mcp.json` at your ticket system: the hosted Atlassian server (OAuth), the token-based `atlassian-token` server, or your own MCP server. The skills need four ticket actions: search, read, change status, comment.
+4. Copy `.github/workflows/sdlc-gate.yml` and `.github/scripts/`, add the repository secrets, and protect your main branch with the three checks and one approving review.
+5. Give each person a `lab.env` with the dashboard URL and token, or leave it out: without a dashboard the hooks stay silent.
 
 ## Repo map
 
 | Folder | What is in it |
 |---|---|
-| `.bob/` | the bob-sdlc plugin (modes, skills, rules, MCP), hook settings, hooks |
-| `.github/` | the sdlc-gate CI workflow, PR template, CODEOWNERS |
-| `data/` | FieldOps work orders and crews (CSV) |
-| `docs/` | lab documents |
-| `fieldops/` | the old system the tickets change |
-| `governance/` | the PR checklist the PR gate enforces |
-| `lanes/` | lab rehearsal lanes |
-| `plans/` | specs written by the Plan mode |
-| `tests/` | FieldOps tests |
-| `tickets/` | the ticket texts seeded into Jira |
-| `tools/` | CI helpers, Jira seeding, rehearsal tools |
-
-## Reuse this in your own repo
-
-1. Copy these into your repo:
-   - `.bob/plugins/bob-sdlc`
-   - `.bob/settings.json`
-   - `.bob/hooks`
-   - `governance/pr-checklist.yaml`
-2. Create `lab.env` from `lab.env.example`: `LAB_USER`, `DASHBOARD_URL`, `DASHBOARD_TOKEN`. Keep it out of git. Without a dashboard the hooks stay silent and fail open.
-3. Edit the rules in `.bob/plugins/bob-sdlc/rules/` for your team: who you are, approved libraries, protected paths.
-4. Change ticketing by editing `.bob/plugins/bob-sdlc/mcp.json`. Pick one entry and disable the others:
-   - `atlassian`: the hosted Atlassian MCP server with OAuth. Each user signs in once in the browser.
-   - `atlassian-token`: a local server that uses `JIRA_URL`, `JIRA_USERNAME` and `JIRA_API_TOKEN` from the environment.
-   - Your own MCP server for another ticket system. The skills name the Jira actions they need (search, read, change status, comment); map them in `skills/tickets/SKILL.md`.
-5. Copy `.github/workflows/sdlc-gate.yml` and `tools/ci/` for the CI gate, set the secrets, then protect the main branch: required checks tests, protected-paths, bob-review and one approving review.
-
-Hooks are a speed bump. CI and branch protection are the real controls.
+| `.bob/` | The bob-sdlc plugin (modes, skills, rules, MCP), hook settings, hooks |
+| `.github/` | The CI workflow, its scripts, PR template, CODEOWNERS |
+| `fieldops/`, `data/`, `tests/` | The old system the tickets change |
+| `governance/` | The PR checklist and the governance rules |
+| `plans/`, `changes/` | Specs and change notes, one per ticket |
+| `docs/` | Participant guide, architecture |
+| `setup.sh`, `setup.ps1` | Participant setup |

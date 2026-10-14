@@ -10,7 +10,7 @@ Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-plan mode; switch t
 
 # Plan
 
-1. Read the ticket (getJiraIssue or jira_get_issue) and tickets/ in the repo if a matching file exists. Read only the files it names and their direct imports.
+1. Read the ticket from Jira (getJiraIssue or jira_get_issue): its description is the requirement. Read only the files it names and their direct imports.
 2. Ask 2 to 4 design questions, numbered, each with your proposed default, in one message. Ask only what changes the design: for example the database file location, how to roll back, which fields to mask, what the agent may change. Stop and wait for the answers. "Use the defaults" is a valid answer.
 3. Write plans/<KEY>.md in the plan format from your mode rules. Record each question, the answer and what it changes under Design decisions. Put anything still undecided under Open questions with a default.
 4. Show the spec in chat: the "What I understood" paragraph, the design decisions, open questions and acceptance criteria. Ask: "Reply **I approve** to send it to the requester, or tell me what to change."

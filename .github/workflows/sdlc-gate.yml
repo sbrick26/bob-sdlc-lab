@@ -3,7 +3,7 @@
 # Jobs:
 #   tests            pytest on every PR and push to main (no tests yet = pass).
 #   protected-paths  deterministic: a PR may not touch .bob/ .github/ governance/
-#                    tools/ dashboard/ unless the author is the repo owner or the
+#                    unless the author is the repo owner or the
 #                    PR has the `platform` label.
 #   bob-review       headless Bob review of the PR against plans/<KEY>.md. Rules,
 #                    hooks, modes, checklist and CI helpers come from main, never
@@ -91,7 +91,7 @@ jobs:
         run: |
           git fetch -q origin "$BASE_REF"
           # The checker itself comes from main, so a PR cannot weaken it.
-          git show "origin/$BASE_REF:tools/ci/protected_paths.py" > "$RUNNER_TEMP/protected_paths.py"
+          git show "origin/$BASE_REF:.github/scripts/protected_paths.py" > "$RUNNER_TEMP/protected_paths.py"
           git diff --name-only "origin/$BASE_REF...HEAD" | tee "$RUNNER_TEMP/changed.txt"
           python3 "$RUNNER_TEMP/protected_paths.py" < "$RUNNER_TEMP/changed.txt"
 
@@ -115,7 +115,7 @@ jobs:
         run: |
           {
             echo "MAIN_DIR=$RUNNER_TEMP/main"
-            echo "CI_DIR=$RUNNER_TEMP/main/tools/ci"
+            echo "CI_DIR=$RUNNER_TEMP/main/.github/scripts"
             echo "OUT_DIR=$RUNNER_TEMP/review"
           } >> "$GITHUB_ENV"
 
@@ -424,4 +424,4 @@ jobs:
       - name: Move the Jira ticket to Done
         if: steps.pr.outputs.found == 'true'
         continue-on-error: true
-        run: python3 tools/ci/jira_transition.py "${{ steps.pr.outputs.key }}" "${{ steps.pr.outputs.url }}"
+        run: python3 .github/scripts/jira_transition.py "${{ steps.pr.outputs.key }}" "${{ steps.pr.outputs.url }}"

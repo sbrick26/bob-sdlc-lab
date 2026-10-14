@@ -17,7 +17,7 @@ def test_clean_diff_passes():
 
 def test_protected_fails():
     for p in [".bob/settings.json", ".github/workflows/x.yml", "governance/pr-checklist.yaml",
-              "tools/ci/parse_verdict.py", "dashboard/app.py"]:
+              ".github/scripts/parse_verdict.py"]:
         assert run(["fieldops/app.py", p]) == 1, p
 
 

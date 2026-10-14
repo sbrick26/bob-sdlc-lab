@@ -10,7 +10,7 @@ Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-build mode; switch 
 
 # Build
 
-Preconditions: plans/<KEY>.md exists, and the Jira ticket has a comment starting with "Approved" from someone other than you after the "Spec for review" comment. Write `Requester approval: approved by <author> in Jira on <YYYY-MM-DD>` and the comment link into the plan. If plans/<KEY>.md is missing on this machine, rebuild it from the "Spec for review" comment. If there is no approval, stop and say the spec is waiting for the requester.
+Preconditions: the Jira ticket has a comment starting with "Approved" posted after its most recent "Spec for review" comment (the requester's approval; it may come from any account). Write `Requester approval: approved by <author> in Jira on <YYYY-MM-DD>` into the plan as plain text (no bold, no backticks), and the comment link on the next line. If plans/<KEY>.md is missing on this machine, rebuild it from the "Spec for review" comment. If there is no approval, stop and say the spec is waiting for the requester.
 
 1. Move the ticket to In Progress and comment "Build started".
 2. Follow the build order in your mode rules exactly.

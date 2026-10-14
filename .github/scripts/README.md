@@ -14,4 +14,4 @@
 | `parse_verdict.py` | reads `review.json`, prints the verdict JSON, writes the PR comment. Exit 0 PASS, 2 FAIL, 3 none |
 | `protected_paths.py` | the protected-paths check |
 | `jira_transition.py` | moves `<KEY>` to Done and adds a comment with the PR link |
-| `tests/` | `.venv/bin/python -m pytest -q tools/ci/tests` |
+| `tests/` | `.venv/bin/python -m pytest -q .github/scripts/tests` |
