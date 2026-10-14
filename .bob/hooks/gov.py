@@ -30,9 +30,20 @@ headers = {
 if event == "Stop" and payload.get("session_id"):
     try:
         import sqlite3
-        db = sqlite3.connect("file:" + os.path.expanduser("~/.bob/db/bob.db") + "?mode=ro", uri=True, timeout=1)
         sid = payload["session_id"]
-        row = db.execute("select costs from tasks where id = ?", (sid,)).fetchone()
+        db = row = None
+        # Bob Shell keeps sessions in ~/.bob/db/bob.db, and some in ~/.bob/dev-db/bob.db: use whichever has this one.
+        for path in ("~/.bob/db/bob.db", "~/.bob/dev-db/bob.db"):
+            full = os.path.expanduser(path)
+            if not os.path.exists(full):
+                continue
+            cand = sqlite3.connect("file:" + full + "?mode=ro", uri=True, timeout=1)
+            row = cand.execute("select costs from tasks where id = ?", (sid,)).fetchone()
+            if row:
+                db = cand
+                break
+        if db is None:
+            raise LookupError("session not in local Bob stores")
         ids = [sid] + [r[0] for r in db.execute("select id from tasks where parent_id = ?", (sid,))]
         q = ",".join("?" * len(ids))
         turns, ctx = db.execute("select count(*), coalesce(sum(json_extract(data,'$._meta.spend.contextTokens')),0) from messages "
