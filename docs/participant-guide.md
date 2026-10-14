@@ -32,7 +32,7 @@ You need: Bob IDE 2.2.2 or newer (signed in), git, python3, a modern browser, an
 1. In the Bob chat, type: `check my tickets` (or `/tickets`).
 2. Bob searches Jira as you and shows a short table: key, title, status, priority.
 3. Bob recommends one ticket and asks `Start <KEY>?`. It does not start without a yes.
-4. Reply `yes`. Bob moves the ticket to In Progress, adds the comment "Started with Bob", and says: `Run /plan <KEY> to write the spec.`
+4. Reply `yes`. Bob moves the ticket to In Progress, adds the comment "Started with Bob", and goes straight into writing the plan.
 
 Bob never picks a ticket assigned to someone else.
 

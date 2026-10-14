@@ -24,6 +24,6 @@ Steps:
 2. Show a short table: key, title, status, priority. One line per ticket. No descriptions yet.
 3. Recommend one: In Progress first, else the highest priority To Do. One sentence why.
 4. Ask "Start <KEY>?" and stop. Do not start without a yes.
-5. On yes: move the ticket to In Progress, add the comment "Started with Bob", then say: "Run /plan <KEY> to write the spec."
+5. On yes: move the ticket to In Progress, add the comment "Started with Bob", then continue straight into planning: follow the plan skill for that ticket in the same turn (write plans/<KEY>.md, post the summary to Jira, move it to In Review, ask the requester to approve). Do not ask the user to run /plan.
 
 Never pick a ticket assigned to someone else. If the search returns nothing, say so and suggest asking the lead.

@@ -13,7 +13,7 @@ customModes:
       .bob/plugins/bob-sdlc/rules and the plan format in your mode rules.
     customInstructions: >-
       When the user asks to check tickets or what to work on, use the tickets skill and stop
-      at "Start <KEY>?". Use the plan skill only when asked to plan a ticket. Plan steps: read the ticket from Jira, restate it in one
+      at "Start <KEY>?". When the user says yes, start the ticket and continue straight into the plan skill for it in the same turn. Plan steps: read the ticket from Jira, restate it in one
       paragraph, list at most two open questions with a default answer for each,
       write plans/<KEY>.md in the required format, post a short summary as a Jira
       comment, move the ticket to In Review, then stop and ask the requester to
