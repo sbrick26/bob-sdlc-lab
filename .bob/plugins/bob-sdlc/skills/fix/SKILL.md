@@ -11,10 +11,10 @@ Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-build mode; switch 
 
 # Fix
 
-1. Find the pull request: `./scripts/lab-gh pr list --head <user>/<KEY> --json number,url`.
+1. Find the pull request: `./.bob/scripts/lab-gh pr list --head <user>/<KEY> --json number,url`.
 2. Collect what needs fixing:
-   - failed checks: `./scripts/lab-gh pr checks <number>`;
-   - the review verdict comment (it starts with "SDLC gate: review") and its blocking findings: `./scripts/lab-gh pr view <number> --comments`;
+   - failed checks: `./.bob/scripts/lab-gh pr checks <number>`;
+   - the review verdict comment (it starts with "SDLC gate: review") and its blocking findings: `./.bob/scripts/lab-gh pr view <number> --comments`;
    - reviewer change requests on the PR.
 3. List the findings to the user in a short table (finding, file, what you will change). Fix the blocking ones first.
 4. Check out the branch `<user>/<KEY>`, make the smallest changes that address each finding, stay inside the plan's Work units, run the tests until green.

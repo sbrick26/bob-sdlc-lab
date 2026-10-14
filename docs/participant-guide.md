@@ -68,7 +68,7 @@ Bob never picks a ticket assigned to someone else.
    4. Run `python -m pytest -q` until green.
    5. Write `changes/<KEY>.md`: the key and what changed, then why.
    6. Ask a subagent to compare the diff with the plan. Fix real gaps.
-   7. Commit, push, open the PR with `./scripts/lab-gh pr create`, labelled with your name. It uses the lab GitHub account, so you never sign in to GitHub.
+   7. Commit, push, open the PR with `./.bob/scripts/lab-gh pr create`, labelled with your name. It uses the lab GitHub account, so you never sign in to GitHub.
    8. Comment the PR link on the Jira ticket. Move it to In Review.
 2. See two blocks. Before Bob starts building, send these two prompts, one at a time:
 
