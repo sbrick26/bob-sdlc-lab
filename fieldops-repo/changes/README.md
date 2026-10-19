@@ -1,4 +1,10 @@
 # Changes
 
-One file per ticket: `fieldops-repo/changes/<KEY>.md`. Line 1 is the key and what changed, line 2 is why.
-One file per ticket means two PRs never edit the same line, so parallel PRs do not conflict.
+This folder holds one change note per ticket: `fieldops-repo/changes/<KEY>.md`.
+
+| Line | What it says |
+|---|---|
+| 1 | The ticket key and what changed |
+| 2 | Why |
+
+Each ticket has its own file. So two pull requests never edit the same line, and they do not conflict.

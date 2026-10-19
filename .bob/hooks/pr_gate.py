@@ -19,7 +19,7 @@ path = str(ti.get("path") or ti.get("file_path") or "")
 if tool in ("write_file", "apply_diff", "insert_content", "search_and_replace") and re.sub(r"^(\./)+", "", path).startswith(PROTECTED):
     print("Protected path: %s is changed only in a platform PR, not in a ticket branch." % path, file=sys.stderr); sys.exit(2)
 if (tool in ("read_file",) and re.search(r"(^|/)lab\.env$", path)) or (tool == "execute_command" and re.search(r"(^|[\s/'\"])lab\.env\b", cmd) and not re.search(r"lab\.env\.example", cmd)):
-    print("Protected file: lab.env holds your tokens and is not read by Bob. Use my-lab.txt for your profile and links.", file=sys.stderr); sys.exit(2)
+    print("Protected file: lab.env holds your tokens and is not read by Bob. Use my-lab.txt for your lab id.", file=sys.stderr); sys.exit(2)
 if tool == "execute_command" and re.search(r"bob-run\b|\.bob[/\\]run\b", cmd) and re.search(r">|>>|\btee\b|\btouch\b|\bcp\b|\bmv\b|\bprintf\b|\becho\b|\brm\b", cmd):
     print("Protected path: the hooks' bob-run folder (and .bob/run) is written only by the hooks. Run the tests instead.", file=sys.stderr); sys.exit(2)
 

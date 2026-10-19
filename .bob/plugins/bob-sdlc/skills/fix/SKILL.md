@@ -7,7 +7,7 @@ metadata:
   argument-hint: <TICKET-KEY>
 ---
 
-Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-build mode; switch to it if you are not in it.
+Ticket: $1 (or the user's ticket from Jira, as in the tickets skill). Work in the sdlc-build mode; switch to it if you are not in it.
 
 # Fix
 
@@ -19,4 +19,4 @@ Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-build mode; switch 
 3. List the findings to the user in a short table (finding, file, what you will change). Fix the blocking ones first.
 4. Check out the branch `<user>/<KEY>`, make the smallest changes that address each finding, stay inside the plan's Work units, run the tests (`cd fieldops-repo && .venv/bin/python -m pytest -q`) until green.
 5. Commit "<KEY>: address review findings", push. CI runs again on its own.
-6. Comment on the PR which findings you fixed. Say CI is reviewing again, switch back to the sdlc mode (SDLC Agent) and say so, and end with the "Your links" block.
+6. Comment on the PR which findings you fixed. Say CI is reviewing again and give the pull request link in one sentence. Switch back to the sdlc mode (SDLC Agent) and say so.

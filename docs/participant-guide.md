@@ -1,6 +1,6 @@
 # Participant guide
 
-One hour. One old system. Four tickets. You take one Jira ticket to a merged pull request. Bob does the work. The process decides what is allowed.
+One hour. One old system. Four tickets. You take one Jira ticket to a merged pull request (PR). Bob does the work. The process decides what is allowed.
 
 A visual version of this guide, with copy buttons, is in [lab.html](lab.html). Download it and open it in a browser.
 
@@ -25,7 +25,7 @@ Your Jira login is `ibm.demo.dev+<lab id>@gmail.com`, for example `ibm.demo.dev+
 | Your pull requests | `https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A<lab id>` |
 | Dashboard | https://bob-sdlc-lab-dashboard.2fxmskmi3eal.ca-tor.codeengine.appdomain.cloud |
 
-You do not need to copy these. Setup writes your own links into `my-lab.txt`, and every Bob reply ends with a **Your links** block.
+You do not need to copy these. Setup prints your own links when it finishes, and Bob gives you the Jira ticket link after the spec and the pull request link after the build.
 
 ## The prompts you type
 
@@ -52,7 +52,7 @@ You never type a slash command. You never switch modes by hand after step 1. Bob
 | SDLC Build | Tests, code, pull request, fixes. | Full tools, with the hooks and the PR gate. |
 | SDLC Review | Reviews a change against its spec. | CI uses it on every pull request. Read and run tests only. |
 
-Narrow tools per stage is a control. The Plan mode cannot write code, even if you ask.
+Each mode has only the tools for its stage. This is a control: the Plan mode cannot write code, even if you ask.
 
 ## Timeline
 
@@ -69,7 +69,7 @@ Narrow tools per stage is a control. The Plan mode cannot write code, even if yo
 | 52 to 58 | Dashboard walk | Open the dashboard | none |
 | 58 to 60 | Take home | Questions | none |
 
-In rehearsal, one ticket used about 7 Bobcoins and about 10 minutes of Bob time from start to pull request.
+In rehearsal, one ticket used about 7 Bobcoins (Bob usage credits) and about 10 minutes of Bob time from start to pull request.
 
 ## 0 to 8 min: set up
 
@@ -92,7 +92,7 @@ You need: Bob IDE 2.2.2 or newer (signed in), git, python3 3.10 or newer, the `g
 2. Setup checks for git, python3 and gh. On a Mac with Homebrew it offers to install what is missing.
 3. Setup shows four lab profiles. Type your number from the card (1 Sam, 2 Priya, 3 Jordan, 4 Alex).
 4. Setup asks for two tokens from your card: `Dashboard token from your card:` and `GitHub lab token from your card` (hidden as you type). The dashboard URL is built in.
-5. Setup writes `lab.env` (your tokens; Bob never reads it) and `my-lab.txt` (your profile and links) at the repo root. It sets your git name and email for this folder. It installs the app in `fieldops-repo/.venv`.
+5. Setup writes `lab.env` (your tokens; Bob never reads it) and `my-lab.txt` (one line, `user=<your lab id>`) at the repo root. It sets your git name and email for this folder. It installs the app in `fieldops-repo/.venv`.
 6. Setup ends with `Ready, <name>. Your details:` and your ticket, Jira, dashboard and pull request links. Then: `Next: in Bob IDE pick the SDLC Agent mode and type: check my tickets`.
 7. On a Mac, Bob IDE opens the folder. If not, open the `bob-sdlc-lab` folder (the repo root, not `fieldops-repo/`) in Bob IDE yourself.
 8. In the Bob chat panel, open the mode list. The lab modes are at the end of the list: `SDLC Agent`, `SDLC Plan`, `SDLC Build`, `SDLC Review`. Select **SDLC Agent**.
@@ -109,14 +109,13 @@ You never sign in to GitHub. Bob pushes and opens pull requests with the shared 
 check my tickets
 ```
 
-The first time Bob uses Jira, Bob IDE opens a browser for the Atlassian sign-in. Sign in with the Jira login and password on your card.
+Bob connects to Jira through MCP (a connector in Bob IDE). The first time Bob uses Jira, Bob IDE opens a browser for the Atlassian sign-in. Sign in with the Jira login and password on your card.
 
 | You see | What it means |
 |---|---|
 | A short table: key, title, status | Bob searched Jira as you. You see only your own tickets. |
 | One line with the stage, for example "KAN-157 is To Do" | Bob reads the stage from Jira and GitHub every time. |
 | `Start <KEY>?` | Bob waits. It does not start without a yes. |
-| **Your links** | Your ticket, the board, your pull requests, your dashboard view. |
 
 **Step 2.** Type:
 
@@ -168,7 +167,7 @@ I approve
 |---|---|
 | Comment headed "Spec for review" (under 30 lines) | Jira |
 | Ticket moves to In Review | Jira |
-| "The spec is on the ticket. The requester approves by commenting Approved there. Then start a new chat and say check my tickets, and I will build it." | Bob chat |
+| "The spec is on the ticket: <ticket link>. The requester approves by commenting Approved there. Then start a new chat and say check my tickets, and I will build it." | Bob chat |
 | Bob switches back to **SDLC Agent** | Bob chat |
 
 ## 20 to 22 min: step 5, the requester approves
@@ -227,7 +226,7 @@ Bob sees the `Approved` comment and starts the build. It switches to **SDLC Buil
 | 8 | A self-review subagent compares the diff with the spec. Bob fixes real gaps. | subagent output |
 | 9 | Commits, pushes, opens the PR into `demo-dev` with your lab id as its label, with `./.bob/scripts/lab-gh` | PR link |
 | 10 | Comments the PR link on the Jira ticket, moves it to In Review | Jira |
-| 11 | Says CI is now reviewing the PR, switches back to **SDLC Agent** | Bob chat |
+| 11 | Says CI is now reviewing the PR, gives the PR link, switches back to **SDLC Agent** | Bob chat |
 
 ### The PR gate
 
@@ -251,8 +250,8 @@ The PR targets `demo-dev`, not `main`. CI runs these jobs:
 
 | Job | When | What it does |
 |---|---|---|
-| tests | every PR and push | runs `python -m pytest -q` in `fieldops-repo/` |
-| protected-paths | every PR | fails if the PR touches `.bob/` (including `.bob/governance/`) or `.github/` |
+| tests | every PR and push | checks the Bob plugin files, then runs `python -m pytest -q` in `fieldops-repo/` |
+| protected-paths | every PR | fails if the PR changes `.bob/` or `.github/`. Only platform PRs may change them. |
 | bob-review | every PR | Bob in **SDLC Review** mode judges the diff against your spec, with the rules taken from main. It posts one PR comment with a verdict block: `VERDICT`, `CRITERIA`, `FINDINGS`, `RULES`, `TESTS`. No verdict means fail. |
 | merged | push to `demo-dev` (the merge) | reports the merge to the dashboard and moves the Jira ticket to Done |
 
@@ -279,7 +278,7 @@ If you say `check my tickets` now, Bob says the ticket is done and points to the
 
 ## 52 to 58 min: dashboard walk
 
-Open the dashboard. The guide gives you the dashboard login. Your own view is the dashboard link in **Your links**.
+Open the dashboard. The guide gives you the dashboard login. Your own view is the dashboard link that setup printed.
 
 | Page | What it tells you |
 |---|---|
@@ -294,7 +293,7 @@ Open the dashboard. The guide gives you the dashboard login. Your own view is th
 
 - One governed path: ticket, spec, approval, tests, review, merge. Each stage has a mode with only the tools it needs.
 - The same plugin works in your repo. See the root [README](../README.md), "Build your own".
-- Hooks are a speed bump. They fail open. CI and branch protection are the real controls.
+- Hooks are a speed bump: if a hook fails, the action still runs. CI and branch protection are the real controls.
 
 ## If something goes wrong
 
@@ -310,6 +309,5 @@ Open the dashboard. The guide gives you the dashboard login. Your own view is th
 | The PR gate refuses | The sentence names the missing item. Bob fixes that item. Never add `--no-verify` or `--force`. |
 | `Protected file: lab.env ...` | Bob tried to read your tokens. That is blocked on purpose. Bob uses `my-lab.txt`. |
 | CI failed | Type `check my tickets`. Bob runs the fix stage. If protected-paths failed, the PR touched `.bob/` or `.github/`; Bob must remove those changes. |
-| No **Your links** block at the end of a reply | Type `check my tickets` again. Bob reads `my-lab.txt` each time. |
 | Dashboard shows nothing under my name | Run setup again and check the dashboard token from your card. Setup prints `Lab dashboard not reachable` when it cannot reach the dashboard; tell the guide. The lab still works without it. |
 | Setup says `Both tokens from your card are needed` | Run setup again and type the dashboard token and the GitHub lab token from your card. |
