@@ -64,6 +64,8 @@ jobs:
           Set-Location fieldops-repo
           .\.venv\Scripts\python.exe -m pytest -q
           if ($LASTEXITCODE -notin 0,5) { throw "pytest exit $LASTEXITCODE" }
+          # Exit code 5 means no tests yet (main has none). The runner would fail on it.
+          exit 0
   unix:
     strategy:
       fail-fast: false
