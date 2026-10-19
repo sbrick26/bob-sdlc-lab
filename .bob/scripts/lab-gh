@@ -1,8 +1,16 @@
 #!/bin/sh
 # Run gh as the shared lab account. Reads LAB_GH_TOKEN from lab.env in the repo root.
 # Usage: ./.bob/scripts/lab-gh pr create ...   (same arguments as gh)
+# "pr list" never shows PRs from earlier lab runs: the facilitator reset labels them lab-archived.
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 T="$(sed -n 's/^LAB_GH_TOKEN=//p' "$ROOT/lab.env" 2>/dev/null | head -1)"
 if [ -n "$T" ]; then GH_TOKEN="$T"; export GH_TOKEN; fi
 unset GITHUB_TOKEN
-GH_HOST=github.com exec gh "$@"
+export GH_HOST=github.com
+if [ "$1" = pr ] && [ "$2" = list ]; then
+  case " $* " in
+    *" --search "*|*" -S "*) ;;
+    *) shift 2; exec gh pr list --search "-label:lab-archived" "$@" ;;
+  esac
+fi
+exec gh "$@"
