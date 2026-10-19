@@ -1,18 +1,20 @@
 # FieldOps
 
-FieldOps is the work-order system for Sequoia Power & Light field crews.
-Dispatch uses it to see open orders, give each order to a crew, and close it.
-Data lives in `data/work_orders.csv` and `data/crews.csv` (in this folder, `fieldops-repo/`).
+FieldOps is the work-order system of Sequoia Power & Light, a fictional utility. Dispatch uses it to see open orders, give each order to a crew and close the order. It was built in 2010 and patched many times. It shipped with no tests.
 
-Run all commands from this folder (`cd fieldops-repo`). The lab setup creates the virtual environment in `.venv` here.
+Run every command from this folder (`cd fieldops-repo`). Lab setup makes the virtual environment in `.venv` here.
 
-| What | Command |
+| To do this | Run |
 |---|---|
-| Web screen | `./run.sh` (makes `.venv` if missing, installs `requirements.txt`), then open http://localhost:8077 |
-| Nightly batch | `.venv/bin/python -m fieldops.nightly` (add `--dry-run` to only print) |
-| Daily report | `.venv/bin/python -m fieldops.report` |
-| Tests | `.venv/bin/python -m pytest -q` (tests go in `tests/`) |
+| Open the web screen | `./run.sh`, then open http://localhost:8077. It makes `.venv` if it is missing. |
+| Run the nightly batch | `.venv/bin/python -m fieldops.nightly`. Add `--dry-run` to only print. |
+| Print the daily report | `.venv/bin/python -m fieldops.report` |
+| Run the tests | `.venv/bin/python -m pytest -q` |
 
-Ticket files live here too: specs in `plans/<KEY>.md`, change notes in `changes/<KEY>.md`.
-
-Built in 2010. Patched many times since. There are no tests.
+| Folder | What is in it |
+|---|---|
+| `fieldops/` | The code |
+| `data/` | `work_orders.csv` and `crews.csv` |
+| `tests/` | The tests. Tests must not change `data/work_orders.csv`. |
+| `plans/` | One spec per ticket: `plans/<KEY>.md` |
+| `changes/` | One change note per ticket: `changes/<KEY>.md` |

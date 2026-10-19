@@ -1,1 +1,9 @@
-Tests live here (fieldops-repo/tests/). Run them from fieldops-repo/: .venv/bin/python -m pytest -q The service shipped without any.
+# Tests
+
+Tests go in this folder. Run them from `fieldops-repo/`:
+
+```sh
+.venv/bin/python -m pytest -q
+```
+
+The app shipped with no tests. Each ticket adds tests from its acceptance criteria.
