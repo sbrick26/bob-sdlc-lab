@@ -7,7 +7,7 @@ metadata:
   argument-hint: <TICKET-KEY>
 ---
 
-Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-build mode; switch to it if you are not in it.
+Ticket: $1 (or the user's ticket from Jira, as in the tickets skill). Work in the sdlc-build mode; switch to it if you are not in it.
 
 # Fix
 

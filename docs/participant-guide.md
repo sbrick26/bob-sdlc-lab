@@ -92,7 +92,7 @@ You need: Bob IDE 2.2.2 or newer (signed in), git, python3 3.10 or newer, the `g
 2. Setup checks for git, python3 and gh. On a Mac with Homebrew it offers to install what is missing.
 3. Setup shows four lab profiles. Type your number from the card (1 Sam, 2 Priya, 3 Jordan, 4 Alex).
 4. Setup asks for two tokens from your card: `Dashboard token from your card:` and `GitHub lab token from your card` (hidden as you type). The dashboard URL is built in.
-5. Setup writes `lab.env` (your tokens; Bob never reads it) and `my-lab.txt` (your profile and links) at the repo root. It sets your git name and email for this folder. It installs the app in `fieldops-repo/.venv`.
+5. Setup writes `lab.env` (your tokens; Bob never reads it) and `my-lab.txt` (one line, `user=<your lab id>`) at the repo root. It sets your git name and email for this folder. It installs the app in `fieldops-repo/.venv`.
 6. Setup ends with `Ready, <name>. Your details:` and your ticket, Jira, dashboard and pull request links. Then: `Next: in Bob IDE pick the SDLC Agent mode and type: check my tickets`.
 7. On a Mac, Bob IDE opens the folder. If not, open the `bob-sdlc-lab` folder (the repo root, not `fieldops-repo/`) in Bob IDE yourself.
 8. In the Bob chat panel, open the mode list. The lab modes are at the end of the list: `SDLC Agent`, `SDLC Plan`, `SDLC Build`, `SDLC Review`. Select **SDLC Agent**.

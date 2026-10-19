@@ -88,6 +88,6 @@ jobs:
           echo '{"hook_event_name":"SessionStart","source":"startup","session_id":"setup-check","cwd":"."}' | python3 .bob/hooks/gov.py
           set +e; echo '{"hook_event_name":"PreToolUse","tool_name":"execute_command","tool_input":{"command":"git push origin main"}}' | python3 .bob/hooks/pr_gate.py; rc=$?; set -e
           test "$rc" = 2
-          test -f my-lab.txt
+          test "$(cat my-lab.txt)" = "user=alex"
           cd fieldops-repo
           .venv/bin/python -m pytest -q || test $? = 5

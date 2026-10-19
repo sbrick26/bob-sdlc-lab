@@ -53,4 +53,4 @@ Hooks are a speed bump: if one fails, the action still runs. CI and branch prote
 | `fieldops-repo/` | The old system the tickets change: `fieldops/` (code), `data/`, `tests/`, `run.sh`, `requirements.txt`, and the ticket files `plans/` and `changes/` (one spec and one change note per ticket) |
 | `docs/` | Participant guide, architecture |
 | `lab-setup/` | Participant setup: `mac-setup.sh` (macOS and Linux), `windows-setup.ps1` |
-| `lab.env`, `my-lab.txt` | Written by setup at the repo root, never committed: tokens (Bob never reads it) and your profile and links |
+| `lab.env`, `my-lab.txt` | Written by setup at the repo root, never committed: tokens (Bob never reads it) and your lab id (`user=<id>`) |

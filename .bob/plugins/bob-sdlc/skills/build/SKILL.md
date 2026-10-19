@@ -7,7 +7,7 @@ metadata:
   argument-hint: <TICKET-KEY>
 ---
 
-Ticket: $1 (or the ticket from my-lab.txt). Work in the sdlc-build mode; switch to it if you are not in it.
+Ticket: $1 (or the user's ticket from Jira, as in the tickets skill). Work in the sdlc-build mode; switch to it if you are not in it.
 
 # Build
 
@@ -21,7 +21,7 @@ Facts that save you turns:
 - Tests: `cd fieldops-repo && .venv/bin/python -m pytest -q` (run from the repo root). Tests go in fieldops-repo/tests/. Tests must not change fieldops-repo/data/work_orders.csv; copy it to a temp dir in a fixture.
 - The user name for the branch is the user line in my-lab.txt. Never open lab.env.
 - Change note: write fieldops-repo/changes/<KEY>.md.
-- PR: `./.bob/scripts/lab-gh pr create --base demo-dev --label <user> --title "<KEY>: <title>" --body-file <file>`. The body starts with `Opened by <name> for <KEY>.` then the sections of .github/pull_request_template.md.
+- PR: `./.bob/scripts/lab-gh pr create --base demo-dev --label <user> --title "<KEY>: <title>" --body-file <file>`. The body starts with `Opened by <author name from git var GIT_AUTHOR_IDENT> for <KEY>.` then the sections of .github/pull_request_template.md.
 - The pr-gate hook runs before every push and PR. If it refuses, it prints the missing checklist item. Fix that item. Never add --no-verify.
 - Self-review subagent prompt: "Compare `git diff origin/demo-dev...HEAD` with fieldops-repo/plans/<KEY>.md. List each acceptance criterion as met or not met with evidence. List any file changed outside Work units. Nothing else."
 - At the end: comment the PR link on the Jira ticket, move it to In Review, say CI is now reviewing the pull request and give its link in one sentence, then switch back to the sdlc mode (SDLC Agent) and say so.

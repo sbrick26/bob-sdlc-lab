@@ -77,18 +77,8 @@ DASHBOARD_TOKEN=$DASH_TOKEN
 LAB_GH_TOKEN=$GH_LAB_TOKEN
 ENV
 chmod 600 lab.env
-case "$NAME" in sam|priya) TEAM=Platform;; jordan|alex) TEAM="Field Apps";; *) TEAM=unassigned;; esac
 case "$NAME" in sam) TICKET=KAN-157;; priya) TICKET=KAN-158;; jordan) TICKET=KAN-159;; alex) TICKET=KAN-160;; *) TICKET="";; esac
-cat > my-lab.txt <<PROFILE
-user=$NAME
-name=$FULL
-team=$TEAM
-ticket=$TICKET
-jira_ticket=https://demo-ibm-bob.atlassian.net/browse/$TICKET
-jira_board=https://demo-ibm-bob.atlassian.net/jira/software/projects/KAN/boards
-prs=https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A$NAME
-dashboard=$LAB_DASHBOARD_URL/#/audit?user=$NAME
-PROFILE
+echo "user=$NAME" > my-lab.txt
 git config user.name "$FULL"
 git config user.email "$NAME@lab.sequoia.example"
 # Push as the shared lab account, for this folder only. Your own GitHub login is not touched.
