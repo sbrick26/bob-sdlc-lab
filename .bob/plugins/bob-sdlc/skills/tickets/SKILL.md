@@ -8,7 +8,7 @@ metadata:
 
 # Check my tickets
 
-1. Read my-lab.txt at the repo root. It has user, name, team, ticket and the links. Never open lab.env.
+1. When you need the user's lab id or ticket key, read only the user and ticket lines of my-lab.txt at the repo root. Never open lab.env.
 2. Find the user's open tickets in Jira, acting as the signed-in user:
    - Hosted Atlassian server: getAccessibleAtlassianResources once for the cloudId, then searchJiraIssuesUsingJql.
    - Token server: jira_search.
@@ -21,12 +21,5 @@ metadata:
    - Stage 4: switch to the sdlc-build mode and run the build skill.
    - Stage 5: switch to the sdlc-build mode and run the fix skill.
    - Stages 3, 6, 7: say what is happening and who acts next. Stop.
-6. End every reply with:
-
-   **Your links**
-   - Ticket: <jira_ticket from my-lab.txt>
-   - Jira board: <jira_board>
-   - Your pull requests: <prs>
-   - Your activity on the dashboard: <dashboard>
 
 Never pick a ticket assigned to someone else.

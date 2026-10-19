@@ -25,7 +25,7 @@ Your Jira login is `ibm.demo.dev+<lab id>@gmail.com`, for example `ibm.demo.dev+
 | Your pull requests | `https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A<lab id>` |
 | Dashboard | https://bob-sdlc-lab-dashboard.2fxmskmi3eal.ca-tor.codeengine.appdomain.cloud |
 
-You do not need to copy these. Setup writes your own links into `my-lab.txt`, and every Bob reply ends with a **Your links** block.
+You do not need to copy these. Setup prints your own links when it finishes, and Bob gives you the Jira ticket link after the spec and the pull request link after the build.
 
 ## The prompts you type
 
@@ -116,7 +116,6 @@ The first time Bob uses Jira, Bob IDE opens a browser for the Atlassian sign-in.
 | A short table: key, title, status | Bob searched Jira as you. You see only your own tickets. |
 | One line with the stage, for example "KAN-157 is To Do" | Bob reads the stage from Jira and GitHub every time. |
 | `Start <KEY>?` | Bob waits. It does not start without a yes. |
-| **Your links** | Your ticket, the board, your pull requests, your dashboard view. |
 
 **Step 2.** Type:
 
@@ -279,7 +278,7 @@ If you say `check my tickets` now, Bob says the ticket is done and points to the
 
 ## 52 to 58 min: dashboard walk
 
-Open the dashboard. The guide gives you the dashboard login. Your own view is the dashboard link in **Your links**.
+Open the dashboard. The guide gives you the dashboard login. Your own view is the dashboard link that setup printed.
 
 | Page | What it tells you |
 |---|---|
@@ -310,6 +309,5 @@ Open the dashboard. The guide gives you the dashboard login. Your own view is th
 | The PR gate refuses | The sentence names the missing item. Bob fixes that item. Never add `--no-verify` or `--force`. |
 | `Protected file: lab.env ...` | Bob tried to read your tokens. That is blocked on purpose. Bob uses `my-lab.txt`. |
 | CI failed | Type `check my tickets`. Bob runs the fix stage. If protected-paths failed, the PR touched `.bob/` or `.github/`; Bob must remove those changes. |
-| No **Your links** block at the end of a reply | Type `check my tickets` again. Bob reads `my-lab.txt` each time. |
 | Dashboard shows nothing under my name | Run setup again and check the dashboard token from your card. Setup prints `Lab dashboard not reachable` when it cannot reach the dashboard; tell the guide. The lab still works without it. |
 | Setup says `Both tokens from your card are needed` | Run setup again and type the dashboard token and the GitHub lab token from your card. |
