@@ -109,7 +109,14 @@ You never sign in to GitHub. Bob pushes and opens pull requests with the shared 
 check my tickets
 ```
 
-Bob connects to Jira through MCP (a connector in Bob IDE). The first time Bob uses Jira, Bob IDE opens a browser for the Atlassian sign-in. Sign in with the Jira login and password on your card.
+Bob connects to Jira through MCP (a connector in Bob IDE). Sign in to it before your first prompt:
+
+1. In Bob IDE, open **Bob Settings**, then **MCP**, then find **atlassian**.
+2. Click **Authenticate**. If you see **Reset auth**, click it first, then click **Authenticate**.
+3. A browser opens. If it signs you in as someone else, sign out of Atlassian first.
+4. Sign in with your Jira email and password.
+5. If Atlassian asks for a verification code, ask the instructor. The code goes to the instructor's email.
+6. The atlassian row shows **Connected**.
 
 | You see | What it means |
 |---|---|
