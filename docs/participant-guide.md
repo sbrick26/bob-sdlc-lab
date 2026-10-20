@@ -19,7 +19,7 @@ Your Jira login is `ibm.demo.dev+<lab id>@gmail.com`, for example `ibm.demo.dev+
 
 | What | Link |
 |---|---|
-| Jira board (project KAN) | https://demo-ibm-bob.atlassian.net/jira/software/projects/KAN/boards |
+| Jira board (project KAN) | https://demo-ibm-bob.atlassian.net/jira/software/projects/KAN/boards/2 |
 | Your ticket | `https://demo-ibm-bob.atlassian.net/browse/<KEY>` |
 | Lab repo | https://github.com/sbrick26/bob-sdlc-lab |
 | Your pull requests | `https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A<lab id>` |
