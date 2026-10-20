@@ -36,8 +36,35 @@ def branch():
         return ""
 
 
+# Jira actions that name the ticket Bob is working on (hosted Atlassian server and the token server).
+JIRA_ACTIONS = {"transitionJiraIssue", "addCommentToJiraIssue", "addOrEditJiraIssueComment", "editJiraIssue",
+                "jira_transition_issue", "jira_add_comment", "jira_update_issue"}
+
+
+def _as_dict(value):
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except Exception:
+            return {}
+    return value if isinstance(value, dict) else {}
+
+
+def jira_action_key(payload):
+    """The ticket key in a Jira write action (move or comment) Bob makes as the signed-in user, else ""."""
+    payload = payload or {}
+    if str(payload.get("tool_name") or "") != "use_mcp_tool":
+        return ""
+    tool_input = _as_dict(payload.get("tool_input"))
+    if str(tool_input.get("tool_name") or "") not in JIRA_ACTIONS:
+        return ""
+    m = KEY_RE.search(json.dumps(_as_dict(tool_input.get("arguments")) or tool_input.get("arguments") or ""))
+    return m.group(1) if m else ""
+
+
 def ticket_key(env=None, payload=None):
-    """LAB_TICKET, else the branch name, else a key seen earlier in this session, else a key in this payload."""
+    """LAB_TICKET, else the branch name, else the ticket of Bob's latest Jira action in this session.
+    Text Bob reads (skills, files, search results) never sets the ticket: it can name other tickets."""
     env = env or lab_env()
     if env.get("LAB_TICKET"):
         return env["LAB_TICKET"]
@@ -46,13 +73,14 @@ def ticket_key(env=None, payload=None):
         return m.group(1)
     sid = str((payload or {}).get("session_id") or "")
     cache = marker_path("ticket-" + re.sub(r"[^A-Za-z0-9_-]", "", sid)[:64]) if sid else None
+    key = jira_action_key(payload)
+    if key:
+        if cache:
+            open(cache, "w").write(key)
+        return key
     if cache and os.path.exists(cache):
         return open(cache).read().strip()
-    text = json.dumps(payload or {})
-    m = KEY_RE.search(text)
-    if m and cache:
-        open(cache, "w").write(m.group(1))
-    return m.group(1) if m else ""
+    return ""
 
 
 _RUN_DIR = None
