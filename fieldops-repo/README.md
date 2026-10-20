@@ -10,6 +10,7 @@ Run every command from this folder (`cd fieldops-repo`). Lab setup makes the vir
 | Run the nightly batch | `.venv/bin/python -m fieldops.nightly`. Add `--dry-run` to only print. |
 | Print the daily report | `.venv/bin/python -m fieldops.report` |
 | Run the tests | `.venv/bin/python -m pytest -q` |
+| Start the MCP server | `.venv/bin/python -m fieldops.mcp_server` |
 
 | Folder | What is in it |
 |---|---|
