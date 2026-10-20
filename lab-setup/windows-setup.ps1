@@ -118,7 +118,7 @@ catch { Miss 'Lab dashboard not reachable; tell the facilitator. The lab still w
 Write-Host ""
 Write-Host "Ready, $Full. Your details:"
 Write-Host "  Ticket        $Ticket"
-Write-Host "  Jira          https://demo-ibm-bob.atlassian.net/jira/software/projects/KAN/boards"
+Write-Host "  Jira          https://demo-ibm-bob.atlassian.net/jira/software/projects/KAN/boards/2"
 Write-Host "  Jira login    ibm.demo.dev+$Name@gmail.com, password from your card"
 Write-Host "  Dashboard     $DashboardUrl"
 Write-Host "  Pull requests https://github.com/sbrick26/bob-sdlc-lab/pulls?q=is%3Apr+label%3A$Name"
