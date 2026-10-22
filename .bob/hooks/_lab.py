@@ -51,14 +51,21 @@ def _as_dict(value):
 
 
 def jira_action_key(payload):
-    """The ticket key in a Jira write action (move or comment) Bob makes as the signed-in user, else ""."""
+    """The ticket key in a Jira write action (move or comment) Bob makes as the signed-in user, else "".
+    Bob names MCP calls mcp__<server>__<tool> with the arguments as the tool input; older builds use
+    use_mcp_tool with {server_name, tool_name, arguments}."""
     payload = payload or {}
-    if str(payload.get("tool_name") or "") != "use_mcp_tool":
-        return ""
+    name = str(payload.get("tool_name") or "")
     tool_input = _as_dict(payload.get("tool_input"))
-    if str(tool_input.get("tool_name") or "") not in JIRA_ACTIONS:
+    if name == "use_mcp_tool":
+        action, args = str(tool_input.get("tool_name") or ""), tool_input.get("arguments")
+    elif name.startswith("mcp__"):
+        action, args = name.rsplit("__", 1)[-1], tool_input or payload.get("tool_input")
+    else:
         return ""
-    m = KEY_RE.search(json.dumps(_as_dict(tool_input.get("arguments")) or tool_input.get("arguments") or ""))
+    if action not in JIRA_ACTIONS:
+        return ""
+    m = KEY_RE.search(json.dumps(_as_dict(args) or args or ""))
     return m.group(1) if m else ""
 
 
